@@ -37,6 +37,16 @@ app.use(cors({
 // ============================================
 app.use('/api/reports', reportRoutesSimple);
 
+
+// ============================================
+// RUTAS ANDROID
+// ============================================
+
+// Importar rutas de Android
+const androidRoutes = require('./routes/androidRoutes');
+// Usar rutas de Android
+app.use('/api/android', androidRoutes);
+
 // ============================================
 // RUTAS BÁSICAS
 // ============================================

@@ -28,6 +28,8 @@ model TituloMinero {
   friProyecciones         FRIProyecciones[]
   friRegalias             FRIRegalias[]
   usuarios                Usuario[]
+  puntosReferencia  PuntoReferencia[]
+  registrosCiclos   RegistroCicloProduccion[]
 
   @@map("titulos_mineros")
 }
@@ -52,6 +54,7 @@ model Usuario {
   friProyecciones         FRIProyecciones[]
   friRegalias             FRIRegalias[]
   tituloMinero            TituloMinero?             @relation(fields: [tituloMineroId], references: [id])
+  registrosCiclos   RegistroCicloProduccion[]
 
   @@map("usuarios")
 }
@@ -248,4 +251,81 @@ model FRIProyecciones {
   usuario              Usuario      @relation(fields: [usuarioId], references: [id])
 
   @@map("fri_proyecciones")
+}
+
+// ============================================
+// MODELO: PUNTOS DE REFERENCIA
+// Puntos de recolección y acopio para tracking GPS
+// ============================================
+model PuntoReferencia {
+  id                String   @id @default(uuid())
+  nombre            String
+  tipo              String   // "RECOLECCION" o "ACOPIO"
+  tituloMineroId    String
+  
+  // Ubicación geográfica
+  latitud           Decimal  @db.Decimal(10, 8)
+  longitud          Decimal  @db.Decimal(11, 8)
+  radioInfluenciaM  Decimal  @db.Decimal(10, 2) @default(50)
+  
+  // Información adicional
+  descripcion       String?
+  activo            Boolean  @default(true)
+  orden             Int      @default(1)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relación
+  tituloMinero      TituloMinero @relation(fields: [tituloMineroId], references: [id])
+
+  @@index([tituloMineroId])
+  @@index([tipo])
+  @@map("puntos_referencia")
+}
+
+// ============================================
+// MODELO: REGISTRO DE CICLOS DE PRODUCCIÓN
+// Ciclos detectados automáticamente por la app móvil
+// ============================================
+model RegistroCicloProduccion {
+  id                String   @id @default(uuid())
+  fecha             DateTime @default(now())
+  usuarioId         String
+  tituloMineroId    String
+  tipoMaquina       String
+  capacidadMaxM3    Decimal  @db.Decimal(10, 2)
+  
+  // Datos del ciclo
+  numeroCiclo       Int
+  horaInicioCiclo   DateTime
+  horaFinCiclo      DateTime
+  duracionMinutos   Decimal  @db.Decimal(10, 2)
+  
+  // Ubicación del ciclo
+  latitudInicio     Decimal  @db.Decimal(10, 8)
+  longitudInicio    Decimal  @db.Decimal(11, 8)
+  latitudFin        Decimal  @db.Decimal(10, 8)
+  longitudFin       Decimal  @db.Decimal(11, 8)
+  
+  // Puntos de referencia
+  puntoRecoleccion  String
+  puntoAcopio       String
+  
+  // Metadata
+  distanciaRecorrida Decimal? @db.Decimal(10, 2)
+  estadoCiclo       String   @default("COMPLETADO")
+  observaciones     String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relaciones
+  usuario           Usuario       @relation(fields: [usuarioId], references: [id])
+  tituloMinero      TituloMinero  @relation(fields: [tituloMineroId], references: [id])
+
+  @@index([fecha])
+  @@index([usuarioId])
+  @@index([tituloMineroId])
+  @@map("registro_ciclos_produccion")
 }
