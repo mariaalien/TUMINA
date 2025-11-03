@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { friService } from '../services/api';
+import { authService,friService } from '../services/api';
 import { 
   ArrowLeft,
   Activity,
@@ -20,6 +20,7 @@ import './Dashboard.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [usuario] = useState(authService.getCurrentUser());
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
     kpis: {
@@ -35,6 +36,14 @@ const Dashboard = () => {
     ultimasParadas: [],
     produccionPorMineral: []
   });
+  const handleLogout = () => {  // ← AGREGAR ESTA FUNCIÓN
+    authService.logout();
+    navigate('/login');
+  };
+
+  useEffect(() => {
+    cargarDatosReales();
+  }, []);
 
   useEffect(() => {
     cargarDatosReales();
@@ -227,6 +236,7 @@ const Dashboard = () => {
   return (
     <div className="dashboard-container">
       {/* Header */}
+      {/* Header */}
       <header className="dashboard-header">
         <div className="container">
           <div className="header-content">
@@ -247,8 +257,8 @@ const Dashboard = () => {
                   <User size={20} />
                 </div>
                 <div className="user-details">
-                  <p className="user-name">{usuario?.nombre || 'Usuario'}</p>
-                  <p className="user-role">{usuario?.rol || 'ROL'}</p>
+                  <p className="user-name">{usuario?.nombre || 'Carlos Fajardo'}</p>
+                  <p className="user-role">{usuario?.rol || 'ADMIN'}</p>
                 </div>
               </div>
               
@@ -258,9 +268,18 @@ const Dashboard = () => {
               </button>
             </div>
           </div>
+
+          {/* Breadcrumb */}
+          <div className="breadcrumb">
+            <button onClick={() => navigate('/home')} className="breadcrumb-link">
+              <ArrowLeft size={16} />
+              Volver al Home
+            </button>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-current">Dashboard</span>
+          </div>
         </div>
       </header>
-
       <main className="page-main">
         <div className="container">
           

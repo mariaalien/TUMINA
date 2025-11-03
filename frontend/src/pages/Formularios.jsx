@@ -32,6 +32,10 @@ import './Formularios.css';
 const Formularios = () => {
   const navigate = useNavigate();
   const [usuario] = useState(authService.getCurrentUser());
+   const handleLogout = () => {  // ← AGREGAR
+    authService.logout();
+    navigate('/login');
+  };
   const [view, setView] = useState('dashboard');
   const [selectedType, setSelectedType] = useState('');
   const [formData, setFormData] = useState({});
@@ -298,8 +302,10 @@ const Formularios = () => {
     if (!confirmar) return;
 
     try {
-      const serviceMethod = `cambiarEstado${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}`;
-      const response = await friService[serviceMethod](id, nuevoEstado);
+      setLoading(true);
+      
+      // Usar el método cambiarEstado con el tipo correcto
+      const response = await friService.cambiarEstado(selectedType, id, nuevoEstado);
 
       if (response.data.success) {
         setMessage({ type: 'success', text: '✅ Estado cambiado correctamente' });
@@ -308,10 +314,13 @@ const Formularios = () => {
         await handleListView(selectedType);
       }
     } catch (error) {
+      console.error('Error al cambiar estado:', error);
       setMessage({ 
         type: 'error', 
-        text: '❌ ' + (error.response?.data?.message || 'Error al cambiar estado') 
+        text: '❌ ' + (error.response?.data?.message || error.message || 'Error al cambiar estado') 
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1642,8 +1651,8 @@ const Formularios = () => {
                   <User size={20} />
                 </div>
                 <div className="user-details">
-                  <p className="user-name">{usuario?.nombre || 'Usuario'}</p>
-                  <p className="user-role">{usuario?.rol || 'ROL'}</p>
+                  <p className="user-name">{usuario?.nombre || 'Carlos Fajardo'}</p>
+                  <p className="user-role">{usuario?.rol || 'ADMIN'}</p>
                 </div>
               </div>
               
@@ -1652,6 +1661,16 @@ const Formularios = () => {
                 Salir
               </button>
             </div>
+          </div>
+
+          {/* Breadcrumb */}
+          <div className="breadcrumb">
+            <button onClick={() => navigate('/home')} className="breadcrumb-link">
+              <ArrowLeft size={16} />
+              Volver al Home
+            </button>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-current">Formularios</span>
           </div>
         </div>
       </header>
