@@ -73,51 +73,72 @@ export const authService = {
   },
 };
 
-// Formularios FRI
+// Formularios FRI (9 tipos completos)
 export const friService = {
-  // Producción
+  // 1. Producción
   getProduccion: (params) => api.get('/fri/produccion', { params }),
   createProduccion: (data) => api.post('/fri/produccion', data),
   updateProduccion: (id, data) => api.put(`/fri/produccion/${id}`, data),
   deleteProduccion: (id) => api.delete(`/fri/produccion/${id}`),
   cambiarEstadoProduccion: (id, estado) => api.put(`/fri/produccion/${id}/estado`, { estado }),
   
-  // Inventarios
+  // 2. Inventarios
   getInventarios: (params) => api.get('/fri/inventarios', { params }),
   createInventarios: (data) => api.post('/fri/inventarios', data),
   updateInventarios: (id, data) => api.put(`/fri/inventarios/${id}`, data),
   deleteInventarios: (id) => api.delete(`/fri/inventarios/${id}`),
   cambiarEstadoInventarios: (id, estado) => api.put(`/fri/inventarios/${id}/estado`, { estado }),
   
-  // Paradas
+  // 3. Paradas
   getParadas: (params) => api.get('/fri/paradas', { params }),
   createParadas: (data) => api.post('/fri/paradas', data),
   updateParadas: (id, data) => api.put(`/fri/paradas/${id}`, data),
   deleteParadas: (id) => api.delete(`/fri/paradas/${id}`),
   cambiarEstadoParadas: (id, estado) => api.put(`/fri/paradas/${id}/estado`, { estado }),
   
-  // Ejecución
+  // 4. Ejecución
   getEjecucion: (params) => api.get('/fri/ejecucion', { params }),
   createEjecucion: (data) => api.post('/fri/ejecucion', data),
   updateEjecucion: (id, data) => api.put(`/fri/ejecucion/${id}`, data),
   deleteEjecucion: (id) => api.delete(`/fri/ejecucion/${id}`),
   cambiarEstadoEjecucion: (id, estado) => api.put(`/fri/ejecucion/${id}/estado`, { estado }),
   
-  // Maquinaria
+  // 5. Maquinaria (Utilización)
   getMaquinaria: (params) => api.get('/fri/maquinaria', { params }),
   createMaquinaria: (data) => api.post('/fri/maquinaria', data),
   updateMaquinaria: (id, data) => api.put(`/fri/maquinaria/${id}`, data),
   deleteMaquinaria: (id) => api.delete(`/fri/maquinaria/${id}`),
   cambiarEstadoMaquinaria: (id, estado) => api.put(`/fri/maquinaria/${id}/estado`, { estado }),
   
-  // Regalías
+  // 6. Regalías
   getRegalias: (params) => api.get('/fri/regalias', { params }),
   createRegalias: (data) => api.post('/fri/regalias', data),
   updateRegalias: (id, data) => api.put(`/fri/regalias/${id}`, data),
   deleteRegalias: (id) => api.delete(`/fri/regalias/${id}`),
   cambiarEstadoRegalias: (id, estado) => api.put(`/fri/regalias/${id}/estado`, { estado }),
 
-  // Borradores
+  // 7. Inventario Maquinaria (NUEVO)
+  getInventarioMaquinaria: (params) => api.get('/fri/inventario-maquinaria', { params }),
+  createInventarioMaquinaria: (data) => api.post('/fri/inventario-maquinaria', data),
+  updateInventarioMaquinaria: (id, data) => api.put(`/fri/inventario-maquinaria/${id}`, data),
+  deleteInventarioMaquinaria: (id) => api.delete(`/fri/inventario-maquinaria/${id}`),
+  cambiarEstadoInventarioMaquinaria: (id, estado) => api.put(`/fri/inventario-maquinaria/${id}/estado`, { estado }),
+
+  // 8. Capacidad (NUEVO)
+  getCapacidad: (params) => api.get('/fri/capacidad', { params }),
+  createCapacidad: (data) => api.post('/fri/capacidad', data),
+  updateCapacidad: (id, data) => api.put(`/fri/capacidad/${id}`, data),
+  deleteCapacidad: (id) => api.delete(`/fri/capacidad/${id}`),
+  cambiarEstadoCapacidad: (id, estado) => api.put(`/fri/capacidad/${id}/estado`, { estado }),
+
+  // 9. Proyecciones (NUEVO)
+  getProyecciones: (params) => api.get('/fri/proyecciones', { params }),
+  createProyecciones: (data) => api.post('/fri/proyecciones', data),
+  updateProyecciones: (id, data) => api.put(`/fri/proyecciones/${id}`, data),
+  deleteProyecciones: (id) => api.delete(`/fri/proyecciones/${id}`),
+  cambiarEstadoProyecciones: (id, estado) => api.put(`/fri/proyecciones/${id}/estado`, { estado }),
+
+  // Funciones generales
   getBorradoresCount: () => api.get('/fri/borradores/count'),
   enviarBorradores: () => api.post('/fri/enviar-borradores'),
 };

@@ -13,33 +13,101 @@ import {
   Send,
   AlertCircle,
   CheckCircle,
-  Filter
+  Filter,
+  FileText,
+  BarChart3,
+  Calendar,
+  Package,
+  PauseCircle,
+  Settings,
+  Truck,
+  DollarSign,
+  Layers,
+  Zap,
+  TrendingUp
 } from 'lucide-react';
 import './Formularios.css';
 
 const Formularios = () => {
   const navigate = useNavigate();
-  const [view, setView] = useState('select'); // select, create, list
+  const [view, setView] = useState('dashboard');
   const [selectedType, setSelectedType] = useState('');
   const [formData, setFormData] = useState({});
   const [formularios, setFormularios] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [borradoresCount, setBorradoresCount] = useState(0);
-  const [filtroEstado, setFiltroEstado] = useState('TODOS'); // TODOS, BORRADOR, ENVIADO, APROBADO, RECHAZADO
+  const [filtroEstado, setFiltroEstado] = useState('TODOS');
+  const [modalFormulario, setModalFormulario] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [dashboardStats, setDashboardStats] = useState({
+    total: 0,
+    borradores: 0,
+    enviados: 0,
+    aprobados: 0,
+    rechazados: 0,
+    porTipo: {}
+  });
 
   const tiposFormularios = [
-    { id: 'produccion', nombre: 'FRI Producción (Mensual)', icon: '🏭' },
-    { id: 'inventarios', nombre: 'FRI Inventarios (Mensual)', icon: '📦' },
-    { id: 'paradas', nombre: 'FRI Paradas de Producción', icon: '⏸️' },
-    { id: 'ejecucion', nombre: 'FRI Ejecución (Mensual)', icon: '⚙️' },
-    { id: 'maquinaria', nombre: 'FRI Utilización de Maquinaria', icon: '🚜' },
-    { id: 'regalias', nombre: 'FRI Regalías (Trimestral)', icon: '💰' },
+    { id: 'produccion', nombre: 'FRI Producción (Mensual)', icon: <FileText size={32} />, color: '#3b82f6' },
+    { id: 'inventarios', nombre: 'FRI Inventarios (Mensual)', icon: <Package size={32} />, color: '#10b981' },
+    { id: 'paradas', nombre: 'FRI Paradas de Producción', icon: <PauseCircle size={32} />, color: '#ef4444' },
+    { id: 'ejecucion', nombre: 'FRI Ejecución (Mensual)', icon: <Settings size={32} />, color: '#f59e0b' },
+    { id: 'maquinaria', nombre: 'FRI Utilización de Maquinaria', icon: <Truck size={32} />, color: '#8b5cf6' },
+    { id: 'regalias', nombre: 'FRI Regalías (Trimestral)', icon: <DollarSign size={32} />, color: '#ec4899' },
+    { id: 'inventarioMaquinaria', nombre: 'FRI Inventario Maquinaria (Anual)', icon: <Layers size={32} />, color: '#06b6d4' },
+    { id: 'capacidad', nombre: 'FRI Capacidad (Anual)', icon: <Zap size={32} />, color: '#14b8a6' },
+    { id: 'proyecciones', nombre: 'FRI Proyecciones (Anual)', icon: <TrendingUp size={32} />, color: '#f97316' },
   ];
 
   useEffect(() => {
+    loadDashboardData();
     loadBorradoresCount();
   }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const stats = {
+        total: 0,
+        borradores: 0,
+        enviados: 0,
+        aprobados: 0,
+        rechazados: 0,
+        porTipo: {}
+      };
+
+      for (const tipo of tiposFormularios) {
+        try {
+          const serviceMethod = `get${tipo.id.charAt(0).toUpperCase() + tipo.id.slice(1)}`;
+          const response = await friService[serviceMethod]();
+          
+          if (response.data.success && response.data.fris) {
+            const fris = response.data.fris;
+            stats.total += fris.length;
+            stats.porTipo[tipo.id] = fris.length;
+
+            fris.forEach(fri => {
+              if (fri.estado === 'BORRADOR') stats.borradores++;
+              else if (fri.estado === 'ENVIADO') stats.enviados++;
+              else if (fri.estado === 'APROBADO') stats.aprobados++;
+              else if (fri.estado === 'RECHAZADO') stats.rechazados++;
+            });
+          }
+        } catch (error) {
+          console.error(`Error al cargar ${tipo.id}:`, error);
+        }
+      }
+
+      setDashboardStats(stats);
+    } catch (error) {
+      console.error('Error al cargar dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadBorradoresCount = async () => {
     try {
@@ -56,6 +124,8 @@ const Formularios = () => {
     setSelectedType(tipo);
     setFormData({});
     setMessage({ type: '', text: '' });
+    setEditMode(false);
+    setEditingId(null);
     setView('create');
   };
 
@@ -86,11 +156,54 @@ const Formularios = () => {
     }
   };
 
+  const handleEdit = (formulario) => {
+    setEditMode(true);
+    setEditingId(formulario.id);
+    
+    // Detectar tipo basándose en los campos
+    let tipo = '';
+    if (formulario.cantidadProduccion !== undefined) tipo = 'produccion';
+    else if (formulario.inventarioInicialAcopio !== undefined) tipo = 'inventarios';
+    else if (formulario.tipoParada !== undefined) tipo = 'paradas';
+    else if (formulario.denominacionFrente !== undefined) tipo = 'ejecucion';
+    else if (formulario.tipoMaquinaria !== undefined && formulario.horasOperacion !== undefined) tipo = 'maquinaria';
+    else if (formulario.valorDeclaracion !== undefined) tipo = 'regalias';
+    else if (formulario.estadoOperativo !== undefined) tipo = 'inventarioMaquinaria';
+    else if (formulario.capacidadInstalada !== undefined) tipo = 'capacidad';
+    else if (formulario.capacidadExtraccion !== undefined) tipo = 'proyecciones';
+    
+    setSelectedType(tipo);
+    
+    // Preparar datos para edición
+    const editData = { ...formulario };
+    
+    // Formatear fechas para inputs
+    if (editData.fechaCorte) {
+      editData.fechaCorte = new Date(editData.fechaCorte).toISOString().split('T')[0];
+    }
+    if (editData.fechaInicio) {
+      editData.fechaInicio = new Date(editData.fechaInicio).toISOString().slice(0, 16);
+    }
+    if (editData.fechaFin && editData.fechaFin !== null) {
+      editData.fechaFin = new Date(editData.fechaFin).toISOString().slice(0, 16);
+    }
+    
+    setFormData(editData);
+    setView('create');
+  };
+
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
+    
+    // Manejar números decimales
+    let processedValue = value;
+    if (type === 'number' && value !== '') {
+      processedValue = parseFloat(value) || 0;
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: processedValue
     }));
   };
 
@@ -100,13 +213,12 @@ const Formularios = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      // Validar que todos los campos requeridos estén presentes
       const form = e.target;
       const requiredFields = form.querySelectorAll('[required]');
       let hasErrors = false;
 
       requiredFields.forEach(field => {
-        if (!field.value) {
+        if (!field.value || field.value === '') {
           hasErrors = true;
           field.classList.add('error');
         } else {
@@ -120,33 +232,56 @@ const Formularios = () => {
         return;
       }
 
-      const serviceMethod = `create${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}`;
-      const response = await friService[serviceMethod](formData);
+      // Preparar datos para envío
+      const submitData = { ...formData };
       
-      if (response.data.success) {
-        setMessage({ type: 'success', text: '✅ ' + response.data.message });
-        setFormData({});
-        form.reset();
+      // Convertir números a formato correcto
+      Object.keys(submitData).forEach(key => {
+        if (typeof submitData[key] === 'string' && !isNaN(submitData[key]) && submitData[key] !== '') {
+          submitData[key] = parseFloat(submitData[key]);
+        }
+      });
+
+      if (editMode && editingId) {
+        // Modo edición
+        const serviceMethod = `update${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}`;
+        const response = await friService[serviceMethod](editingId, submitData);
         
-        // Actualizar contador de borradores
-        await loadBorradoresCount();
-        
-        // Volver a la vista de selección después de 2 segundos
-        setTimeout(() => {
-          setView('select');
-          setMessage({ type: '', text: '' });
-        }, 2000);
+        if (response.data.success) {
+          setMessage({ type: 'success', text: '✅ Formulario actualizado correctamente' });
+          setFormData({});
+          setEditMode(false);
+          setEditingId(null);
+          await loadDashboardData();
+          
+          setTimeout(() => {
+            setView('dashboard');
+            setMessage({ type: '', text: '' });
+          }, 2000);
+        }
       } else {
-        setMessage({ 
-          type: 'error', 
-          text: '❌ ' + (response.data.message || 'Error al crear formulario') 
-        });
+        // Modo creación
+        const serviceMethod = `create${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}`;
+        const response = await friService[serviceMethod](submitData);
+        
+        if (response.data.success) {
+          setMessage({ type: 'success', text: '✅ Formulario creado correctamente' });
+          setFormData({});
+          form.reset();
+          await loadBorradoresCount();
+          await loadDashboardData();
+          
+          setTimeout(() => {
+            setView('dashboard');
+            setMessage({ type: '', text: '' });
+          }, 2000);
+        }
       }
     } catch (error) {
-      console.error('Error al crear formulario:', error);
+      console.error('Error al procesar formulario:', error);
       setMessage({ 
         type: 'error', 
-        text: '❌ ' + (error.response?.data?.message || 'Error al crear formulario. Verifica los datos ingresados.') 
+        text: '❌ ' + (error.response?.data?.message || error.message || 'Error al procesar formulario. Verifica los datos ingresados.') 
       });
     } finally {
       setLoading(false);
@@ -155,8 +290,7 @@ const Formularios = () => {
 
   const handleCambiarEstado = async (id, nuevoEstado) => {
     const confirmar = window.confirm(
-      `¿Estás seguro de cambiar el estado a ${nuevoEstado}?\n\n` +
-      'Este cambio no se puede deshacer.'
+      `¿Estás seguro de cambiar el estado a ${nuevoEstado}?\n\nEste cambio no se puede deshacer.`
     );
 
     if (!confirmar) return;
@@ -166,17 +300,44 @@ const Formularios = () => {
       const response = await friService[serviceMethod](id, nuevoEstado);
 
       if (response.data.success) {
-        setMessage({ type: 'success', text: '✅ ' + response.data.message });
+        setMessage({ type: 'success', text: '✅ Estado cambiado correctamente' });
         await loadBorradoresCount();
+        await loadDashboardData();
         await handleListView(selectedType);
-      } else {
-        setMessage({ type: 'error', text: '❌ ' + response.data.message });
       }
     } catch (error) {
       setMessage({ 
         type: 'error', 
         text: '❌ ' + (error.response?.data?.message || 'Error al cambiar estado') 
       });
+    }
+  };
+
+  const handleDeleteFormulario = async (id) => {
+    const confirmar = window.confirm(
+      '¿Estás seguro de eliminar este formulario?\n\nEsta acción no se puede deshacer.'
+    );
+
+    if (!confirmar) return;
+
+    try {
+      setLoading(true);
+      const serviceMethod = `delete${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}`;
+      const response = await friService[serviceMethod](id);
+
+      if (response.data.success) {
+        setMessage({ type: 'success', text: '✅ Formulario eliminado correctamente' });
+        await loadBorradoresCount();
+        await loadDashboardData();
+        await handleListView(selectedType);
+      }
+    } catch (error) {
+      setMessage({ 
+        type: 'error', 
+        text: '❌ ' + (error.response?.data?.message || 'Error al eliminar formulario') 
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -187,68 +348,26 @@ const Formularios = () => {
     }
 
     const confirmar = window.confirm(
-      `¿Estás seguro de que deseas ENVIAR todos los ${borradoresCount} borradores?\n\n` +
-      'Esto cambiará su estado y ya no podrás editarlos.'
+      `¿Estás seguro de que deseas ENVIAR todos los ${borradoresCount} borradores?\n\nEsto cambiará su estado y ya no podrás editarlos.`
     );
 
     if (!confirmar) return;
 
-    setLoading(true);
     try {
+      setLoading(true);
       const response = await friService.enviarBorradores();
-      
       if (response.data.success) {
-        alert(
-          '✅ ' + response.data.message + '\n\n' +
-          'Detalles:\n' +
-          `- Producción: ${response.data.detalles.produccion}\n` +
-          `- Inventarios: ${response.data.detalles.inventarios}\n` +
-          `- Paradas: ${response.data.detalles.paradas}\n` +
-          `- Ejecución: ${response.data.detalles.ejecucion}\n` +
-          `- Maquinaria: ${response.data.detalles.maquinaria}\n` +
-          `- Regalías: ${response.data.detalles.regalias}`
-        );
-        
+        alert('✅ ' + response.data.message);
         await loadBorradoresCount();
-        
-        // Recargar la lista si está viendo alguna
+        await loadDashboardData();
         if (view === 'list') {
           await handleListView(selectedType);
         }
-      } else {
-        alert('❌ Error: ' + response.data.message);
       }
     } catch (error) {
-      alert('❌ Error de conexión: ' + (error.response?.data?.message || error.message));
+      alert('❌ Error al enviar borradores: ' + error.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDeleteFormulario = async (id) => {
-    const confirmar = window.confirm(
-      '¿Estás seguro de que deseas ELIMINAR este formulario?\n\n' +
-      'Esta acción no se puede deshacer.'
-    );
-
-    if (!confirmar) return;
-
-    try {
-      const serviceMethod = `delete${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}`;
-      const response = await friService[serviceMethod](id);
-
-      if (response.data.success) {
-        setMessage({ type: 'success', text: '✅ Formulario eliminado correctamente' });
-        await loadBorradoresCount();
-        await handleListView(selectedType);
-      } else {
-        setMessage({ type: 'error', text: '❌ ' + response.data.message });
-      }
-    } catch (error) {
-      setMessage({ 
-        type: 'error', 
-        text: '❌ ' + (error.response?.data?.message || 'Error al eliminar formulario') 
-      });
     }
   };
 
@@ -309,41 +428,43 @@ const Formularios = () => {
                   onChange={handleInputChange}
                   min="0"
                   step="0.01"
+                  placeholder="Ej: 720"
                   required
                 />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Cantidad Producción *</label>
-                <input 
-                  type="number" 
-                  name="cantidadProduccion" 
-                  className="form-input"
-                  value={formData.cantidadProduccion || ''}
+                <label className="form-label">Unidad de Medida *</label>
+                <select 
+                  name="unidadMedida" 
+                  className="form-select"
+                  value={formData.unidadMedida || ''}
                   onChange={handleInputChange}
-                  min="0"
-                  step="0.01"
                   required
-                />
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="Toneladas">Toneladas</option>
+                  <option value="Kilogramos">Kilogramos</option>
+                  <option value="Gramos">Gramos</option>
+                  <option value="Onzas">Onzas</option>
+                  <option value="Metros cúbicos">Metros cúbicos</option>
+                </select>
               </div>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Unidad de Medida *</label>
-              <select 
-                name="unidadMedida" 
-                className="form-select"
-                value={formData.unidadMedida || ''}
+              <label className="form-label">Cantidad de Producción *</label>
+              <input 
+                type="number" 
+                name="cantidadProduccion" 
+                className="form-input"
+                value={formData.cantidadProduccion || ''}
                 onChange={handleInputChange}
+                min="0"
+                step="0.0001"
+                placeholder="Cantidad producida"
                 required
-              >
-                <option value="">Seleccione...</option>
-                <option value="Metros Cúbicos (m³)">Metros Cúbicos (m³)</option>
-                <option value="Toneladas (t)">Toneladas (t)</option>
-                <option value="Kilogramos (kg)">Kilogramos (kg)</option>
-                <option value="Gramos (g)">Gramos (g)</option>
-                <option value="Onzas (oz)">Onzas (oz)</option>
-              </select>
+              />
             </div>
 
             <div className="grid grid-2">
@@ -356,7 +477,7 @@ const Formularios = () => {
                   value={formData.materialEntraPlanta || ''}
                   onChange={handleInputChange}
                   min="0"
-                  step="0.01"
+                  step="0.0001"
                 />
               </div>
 
@@ -369,7 +490,7 @@ const Formularios = () => {
                   value={formData.materialSalePlanta || ''}
                   onChange={handleInputChange}
                   min="0"
-                  step="0.01"
+                  step="0.0001"
                 />
               </div>
             </div>
@@ -383,7 +504,7 @@ const Formularios = () => {
                 value={formData.masaUnitaria || ''}
                 onChange={handleInputChange}
                 min="0"
-                step="0.01"
+                step="0.0001"
               />
             </div>
 
@@ -446,40 +567,10 @@ const Formularios = () => {
                 required
               >
                 <option value="">Seleccione...</option>
-                <option value="Metros Cúbicos (m³)">Metros Cúbicos (m³)</option>
-                <option value="Toneladas (t)">Toneladas (t)</option>
-                <option value="Kilogramos (kg)">Kilogramos (kg)</option>
+                <option value="Toneladas">Toneladas</option>
+                <option value="Kilogramos">Kilogramos</option>
+                <option value="Gramos">Gramos</option>
               </select>
-            </div>
-
-            <div className="grid grid-2">
-              <div className="form-group">
-                <label className="form-label">Inventario Inicial Frente *</label>
-                <input 
-                  type="number" 
-                  name="inventarioInicialFrente" 
-                  className="form-input"
-                  value={formData.inventarioInicialFrente || ''}
-                  onChange={handleInputChange}
-                  min="0"
-                  step="0.01"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Inventario Final Frente *</label>
-                <input 
-                  type="number" 
-                  name="inventarioFinalFrente" 
-                  className="form-input"
-                  value={formData.inventarioFinalFrente || ''}
-                  onChange={handleInputChange}
-                  min="0"
-                  step="0.01"
-                  required
-                />
-              </div>
             </div>
 
             <div className="grid grid-2">
@@ -492,7 +583,37 @@ const Formularios = () => {
                   value={formData.inventarioInicialAcopio || ''}
                   onChange={handleInputChange}
                   min="0"
-                  step="0.01"
+                  step="0.0001"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Ingreso Acopio *</label>
+                <input 
+                  type="number" 
+                  name="ingresoAcopio" 
+                  className="form-input"
+                  value={formData.ingresoAcopio || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.0001"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Salida Acopio *</label>
+                <input 
+                  type="number" 
+                  name="salidaAcopio" 
+                  className="form-input"
+                  value={formData.salidaAcopio || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.0001"
                   required
                 />
               </div>
@@ -506,37 +627,7 @@ const Formularios = () => {
                   value={formData.inventarioFinalAcopio || ''}
                   onChange={handleInputChange}
                   min="0"
-                  step="0.01"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-2">
-              <div className="form-group">
-                <label className="form-label">Ingreso Acopio *</label>
-                <input 
-                  type="number" 
-                  name="ingresoAcopio" 
-                  className="form-input"
-                  value={formData.ingresoAcopio || ''}
-                  onChange={handleInputChange}
-                  min="0"
-                  step="0.01"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Salida Acopio *</label>
-                <input 
-                  type="number" 
-                  name="salidaAcopio" 
-                  className="form-input"
-                  value={formData.salidaAcopio || ''}
-                  onChange={handleInputChange}
-                  min="0"
-                  step="0.01"
+                  step="0.0001"
                   required
                 />
               </div>
@@ -559,6 +650,18 @@ const Formularios = () => {
       case 'paradas':
         return (
           <>
+            <div className="form-group">
+              <label className="form-label">Fecha de Corte *</label>
+              <input 
+                type="date" 
+                name="fechaCorte" 
+                className="form-input"
+                value={formData.fechaCorte || ''}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+
             <div className="form-group">
               <label className="form-label">Tipo de Parada *</label>
               <select 
@@ -612,7 +715,7 @@ const Formularios = () => {
                 value={formData.horasParadas || ''}
                 onChange={handleInputChange}
                 min="0"
-                step="0.1"
+                step="0.01"
                 required
               />
             </div>
@@ -644,6 +747,776 @@ const Formularios = () => {
           </>
         );
 
+      case 'ejecucion':
+        return (
+          <>
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Mineral *</label>
+                <select 
+                  name="mineral" 
+                  className="form-select"
+                  value={formData.mineral || ''}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="Plata">Plata</option>
+                  <option value="Oro">Oro</option>
+                  <option value="Carbón">Carbón</option>
+                  <option value="Caliza">Caliza</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Fecha de Corte *</label>
+                <input 
+                  type="date" 
+                  name="fechaCorte" 
+                  className="form-input"
+                  value={formData.fechaCorte || ''}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Denominación del Frente *</label>
+              <input 
+                type="text" 
+                name="denominacionFrente" 
+                className="form-input"
+                value={formData.denominacionFrente || ''}
+                onChange={handleInputChange}
+                placeholder="Ej: Frente A, Frente Norte"
+                required
+              />
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Latitud *</label>
+                <input 
+                  type="number" 
+                  name="latitud" 
+                  className="form-input"
+                  value={formData.latitud || ''}
+                  onChange={handleInputChange}
+                  step="0.00000001"
+                  placeholder="Ej: 4.60971"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Longitud *</label>
+                <input 
+                  type="number" 
+                  name="longitud" 
+                  className="form-input"
+                  value={formData.longitud || ''}
+                  onChange={handleInputChange}
+                  step="0.00000001"
+                  placeholder="Ej: -74.08175"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Método de Explotación *</label>
+              <select 
+                name="metodoExplotacion" 
+                className="form-select"
+                value={formData.metodoExplotacion || ''}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Seleccione...</option>
+                <option value="Cielo abierto">Cielo abierto</option>
+                <option value="Subterráneo">Subterráneo</option>
+                <option value="Mixto">Mixto</option>
+              </select>
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Avance Ejecutado *</label>
+                <input 
+                  type="number" 
+                  name="avanceEjecutado" 
+                  className="form-input"
+                  value={formData.avanceEjecutado || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Unidad Medida Avance *</label>
+                <select 
+                  name="unidadMedidaAvance" 
+                  className="form-select"
+                  value={formData.unidadMedidaAvance || ''}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="Metros">Metros</option>
+                  <option value="Metros cuadrados">Metros cuadrados</option>
+                  <option value="Metros cúbicos">Metros cúbicos</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Volumen Ejecutado *</label>
+              <input 
+                type="number" 
+                name="volumenEjecutado" 
+                className="form-input"
+                value={formData.volumenEjecutado || ''}
+                onChange={handleInputChange}
+                min="0"
+                step="0.0001"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Observaciones</label>
+              <textarea 
+                name="observaciones" 
+                className="form-textarea"
+                value={formData.observaciones || ''}
+                onChange={handleInputChange}
+                placeholder="Observaciones adicionales..."
+                rows="3"
+              />
+            </div>
+          </>
+        );
+
+      case 'maquinaria':
+        return (
+          <>
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Fecha de Corte *</label>
+                <input 
+                  type="date" 
+                  name="fechaCorte" 
+                  className="form-input"
+                  value={formData.fechaCorte || ''}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Tipo de Maquinaria *</label>
+                <select 
+                  name="tipoMaquinaria" 
+                  className="form-select"
+                  value={formData.tipoMaquinaria || ''}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="Excavadora">Excavadora</option>
+                  <option value="Cargador">Cargador</option>
+                  <option value="Volqueta">Volqueta</option>
+                  <option value="Retroexcavadora">Retroexcavadora</option>
+                  <option value="Bulldozer">Bulldozer</option>
+                  <option value="Grúa">Grúa</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Cantidad *</label>
+                <input 
+                  type="number" 
+                  name="cantidad" 
+                  className="form-input"
+                  value={formData.cantidad || ''}
+                  onChange={handleInputChange}
+                  min="1"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Horas de Operación *</label>
+                <input 
+                  type="number" 
+                  name="horasOperacion" 
+                  className="form-input"
+                  value={formData.horasOperacion || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Capacidad de Transporte</label>
+                <input 
+                  type="number" 
+                  name="capacidadTransporte" 
+                  className="form-input"
+                  value={formData.capacidadTransporte || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Unidad de Capacidad</label>
+                <select 
+                  name="unidadCapacidad" 
+                  className="form-select"
+                  value={formData.unidadCapacidad || ''}
+                  onChange={handleInputChange}
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="Toneladas">Toneladas</option>
+                  <option value="Metros cúbicos">Metros cúbicos</option>
+                  <option value="Kilogramos">Kilogramos</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Observaciones</label>
+              <textarea 
+                name="observaciones" 
+                className="form-textarea"
+                value={formData.observaciones || ''}
+                onChange={handleInputChange}
+                placeholder="Observaciones adicionales..."
+                rows="3"
+              />
+            </div>
+          </>
+        );
+
+      case 'regalias':
+        return (
+          <>
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Mineral *</label>
+                <select 
+                  name="mineral" 
+                  className="form-select"
+                  value={formData.mineral || ''}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="Oro">Oro</option>
+                  <option value="Plata">Plata</option>
+                  <option value="Carbón">Carbón</option>
+                  <option value="Esmeraldas">Esmeraldas</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Fecha de Corte *</label>
+                <input 
+                  type="date" 
+                  name="fechaCorte" 
+                  className="form-input"
+                  value={formData.fechaCorte || ''}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Cantidad Extraída *</label>
+                <input 
+                  type="number" 
+                  name="cantidadExtraida" 
+                  className="form-input"
+                  value={formData.cantidadExtraida || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.0001"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Unidad de Medida *</label>
+                <select 
+                  name="unidadMedida" 
+                  className="form-select"
+                  value={formData.unidadMedida || ''}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="Toneladas">Toneladas</option>
+                  <option value="Kilogramos">Kilogramos</option>
+                  <option value="Gramos">Gramos</option>
+                  <option value="Onzas">Onzas</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Valor Declaración *</label>
+                <input 
+                  type="number" 
+                  name="valorDeclaracion" 
+                  className="form-input"
+                  value={formData.valorDeclaracion || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                  placeholder="Valor en COP"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Valor Contraprestaciones</label>
+                <input 
+                  type="number" 
+                  name="valorContraprestaciones" 
+                  className="form-input"
+                  value={formData.valorContraprestaciones || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                  placeholder="Valor en COP"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Resolución UPME</label>
+              <input 
+                type="text" 
+                name="resolucionUPME" 
+                className="form-input"
+                value={formData.resolucionUPME || ''}
+                onChange={handleInputChange}
+                placeholder="Número de resolución"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Observaciones</label>
+              <textarea 
+                name="observaciones" 
+                className="form-textarea"
+                value={formData.observaciones || ''}
+                onChange={handleInputChange}
+                placeholder="Observaciones adicionales..."
+                rows="3"
+              />
+            </div>
+          </>
+        );
+
+      case 'inventarioMaquinaria':
+        return (
+          <>
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Fecha de Corte *</label>
+                <input 
+                  type="date" 
+                  name="fechaCorte" 
+                  className="form-input"
+                  value={formData.fechaCorte || ''}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Tipo de Maquinaria *</label>
+                <input 
+                  type="text" 
+                  name="tipoMaquinaria" 
+                  className="form-input"
+                  value={formData.tipoMaquinaria || ''}
+                  onChange={handleInputChange}
+                  placeholder="Ej: Excavadora, Cargador"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Marca</label>
+                <input 
+                  type="text" 
+                  name="marca" 
+                  className="form-input"
+                  value={formData.marca || ''}
+                  onChange={handleInputChange}
+                  placeholder="Ej: Caterpillar, Komatsu"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Modelo</label>
+                <input 
+                  type="text" 
+                  name="modelo" 
+                  className="form-input"
+                  value={formData.modelo || ''}
+                  onChange={handleInputChange}
+                  placeholder="Ej: 320D, PC200"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Año de Fabricación</label>
+                <input 
+                  type="number" 
+                  name="anoFabricacion" 
+                  className="form-input"
+                  value={formData.anoFabricacion || ''}
+                  onChange={handleInputChange}
+                  min="1900"
+                  max="2100"
+                  placeholder="Ej: 2020"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Capacidad</label>
+                <input 
+                  type="number" 
+                  name="capacidad" 
+                  className="form-input"
+                  value={formData.capacidad || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                  placeholder="Capacidad en toneladas o m³"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Estado Operativo *</label>
+              <select 
+                name="estadoOperativo" 
+                className="form-select"
+                value={formData.estadoOperativo || ''}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Seleccione...</option>
+                <option value="Operativo">Operativo</option>
+                <option value="En mantenimiento">En mantenimiento</option>
+                <option value="Fuera de servicio">Fuera de servicio</option>
+                <option value="En reparación">En reparación</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Observaciones</label>
+              <textarea 
+                name="observaciones" 
+                className="form-textarea"
+                value={formData.observaciones || ''}
+                onChange={handleInputChange}
+                placeholder="Observaciones sobre el estado de la maquinaria..."
+                rows="3"
+              />
+            </div>
+          </>
+        );
+
+      case 'capacidad':
+        return (
+          <>
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Fecha de Corte *</label>
+                <input 
+                  type="date" 
+                  name="fechaCorte" 
+                  className="form-input"
+                  value={formData.fechaCorte || ''}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Área de Producción *</label>
+                <input 
+                  type="text" 
+                  name="areaProduccion" 
+                  className="form-input"
+                  value={formData.areaProduccion || ''}
+                  onChange={handleInputChange}
+                  placeholder="Ej: Zona Norte, Sector A"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Tecnología Utilizada *</label>
+              <input 
+                type="text" 
+                name="tecnologiaUtilizada" 
+                className="form-input"
+                value={formData.tecnologiaUtilizada || ''}
+                onChange={handleInputChange}
+                placeholder="Descripción de la tecnología"
+                required
+              />
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Capacidad Instalada *</label>
+                <input 
+                  type="number" 
+                  name="capacidadInstalada" 
+                  className="form-input"
+                  value={formData.capacidadInstalada || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.0001"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Unidad de Medida *</label>
+                <select 
+                  name="unidadMedida" 
+                  className="form-select"
+                  value={formData.unidadMedida || ''}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="Toneladas/día">Toneladas/día</option>
+                  <option value="Toneladas/mes">Toneladas/mes</option>
+                  <option value="Metros cúbicos/día">Metros cúbicos/día</option>
+                  <option value="Metros cúbicos/mes">Metros cúbicos/mes</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Personal Capacitado *</label>
+              <input 
+                type="number" 
+                name="personalCapacitado" 
+                className="form-input"
+                value={formData.personalCapacitado || ''}
+                onChange={handleInputChange}
+                min="0"
+                placeholder="Número de personas"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Certificaciones</label>
+              <input 
+                type="text" 
+                name="certificaciones" 
+                className="form-input"
+                value={formData.certificaciones || ''}
+                onChange={handleInputChange}
+                placeholder="ISO, RETIE, etc."
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Observaciones</label>
+              <textarea 
+                name="observaciones" 
+                className="form-textarea"
+                value={formData.observaciones || ''}
+                onChange={handleInputChange}
+                placeholder="Observaciones adicionales..."
+                rows="3"
+              />
+            </div>
+          </>
+        );
+
+      case 'proyecciones':
+        return (
+          <>
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Fecha de Corte *</label>
+                <input 
+                  type="date" 
+                  name="fechaCorte" 
+                  className="form-input"
+                  value={formData.fechaCorte || ''}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Mineral *</label>
+                <select 
+                  name="mineral" 
+                  className="form-select"
+                  value={formData.mineral || ''}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="Oro">Oro</option>
+                  <option value="Plata">Plata</option>
+                  <option value="Carbón">Carbón</option>
+                  <option value="Cobre">Cobre</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Método de Explotación *</label>
+              <select 
+                name="metodoExplotacion" 
+                className="form-select"
+                value={formData.metodoExplotacion || ''}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Seleccione...</option>
+                <option value="Cielo abierto">Cielo abierto</option>
+                <option value="Subterráneo">Subterráneo</option>
+                <option value="Mixto">Mixto</option>
+              </select>
+            </div>
+
+            <div className="grid grid-3">
+              <div className="form-group">
+                <label className="form-label">Capacidad Extracción *</label>
+                <input 
+                  type="number" 
+                  name="capacidadExtraccion" 
+                  className="form-input"
+                  value={formData.capacidadExtraccion || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.0001"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Capacidad Transporte *</label>
+                <input 
+                  type="number" 
+                  name="capacidadTransporte" 
+                  className="form-input"
+                  value={formData.capacidadTransporte || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.0001"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Capacidad Beneficio *</label>
+                <input 
+                  type="number" 
+                  name="capacidadBeneficio" 
+                  className="form-input"
+                  value={formData.capacidadBeneficio || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.0001"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-2">
+              <div className="form-group">
+                <label className="form-label">Proyección Topográfica</label>
+                <input 
+                  type="text" 
+                  name="proyeccionTopografia" 
+                  className="form-input"
+                  value={formData.proyeccionTopografia || ''}
+                  onChange={handleInputChange}
+                  placeholder="Sistema de coordenadas"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Densidad del Manto</label>
+                <input 
+                  type="number" 
+                  name="densidadManto" 
+                  className="form-input"
+                  value={formData.densidadManto || ''}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.0001"
+                  placeholder="Densidad en g/cm³"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Cantidad Proyectada *</label>
+              <input 
+                type="number" 
+                name="cantidadProyectada" 
+                className="form-input"
+                value={formData.cantidadProyectada || ''}
+                onChange={handleInputChange}
+                min="0"
+                step="0.0001"
+                placeholder="Cantidad proyectada a extraer"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Observaciones</label>
+              <textarea 
+                name="observaciones" 
+                className="form-textarea"
+                value={formData.observaciones || ''}
+                onChange={handleInputChange}
+                placeholder="Observaciones adicionales..."
+                rows="3"
+              />
+            </div>
+          </>
+        );
+
       default:
         return (
           <div className="alert alert-info">
@@ -653,6 +1526,96 @@ const Formularios = () => {
         );
     }
   };
+
+  const renderDashboard = () => (
+    <div className="dashboard-view">
+      <div className="dashboard-header">
+        <h2>📊 Resumen de Formularios FRI</h2>
+        <p>Vista general de todos los formularios registrados en el sistema</p>
+      </div>
+
+      <div className="stats-grid">
+        <div className="stat-card" style={{ borderLeftColor: '#93c5fd' }}>
+          <div className="stat-icon" style={{ background: '#dbeafe', color: '#1e40af' }}>
+            <FileText size={24} />
+          </div>
+          <div className="stat-content">
+            <h3>{dashboardStats.total}</h3>
+            <p>Total Formularios</p>
+          </div>
+        </div>
+
+        <div className="stat-card" style={{ borderLeftColor: '#fcd34d' }}>
+          <div className="stat-icon" style={{ background: '#fef3c7', color: '#b45309' }}>
+            <Edit size={24} />
+          </div>
+          <div className="stat-content">
+            <h3>{dashboardStats.borradores}</h3>
+            <p>Borradores</p>
+          </div>
+        </div>
+
+        <div className="stat-card" style={{ borderLeftColor: '#67e8f9' }}>
+          <div className="stat-icon" style={{ background: '#cffafe', color: '#0e7490' }}>
+            <Send size={24} />
+          </div>
+          <div className="stat-content">
+            <h3>{dashboardStats.enviados}</h3>
+            <p>Enviados</p>
+          </div>
+        </div>
+
+        <div className="stat-card" style={{ borderLeftColor: '#86efac' }}>
+          <div className="stat-icon" style={{ background: '#d1fae5', color: '#15803d' }}>
+            <CheckCircle size={24} />
+          </div>
+          <div className="stat-content">
+            <h3>{dashboardStats.aprobados}</h3>
+            <p>Aprobados</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="tipos-section">
+        <h3>📝 Formularios por Tipo</h3>
+        <div className="tipos-grid">
+          {tiposFormularios.map((tipo) => (
+            <div key={tipo.id} className="tipo-card" style={{ borderColor: tipo.color }}>
+              <div className="tipo-header">
+                <div className="tipo-icon" style={{ color: tipo.color }}>
+                  {tipo.icon}
+                </div>
+                <div className="tipo-info">
+                  <h4>{tipo.nombre}</h4>
+                  <span className="tipo-count">
+                    {dashboardStats.porTipo[tipo.id] || 0} registros
+                  </span>
+                </div>
+              </div>
+              <div className="tipo-actions">
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => handleTypeSelect(tipo.id)}
+                  title="Crear nuevo formulario"
+                >
+                  <Plus size={16} />
+                  Crear
+                </button>
+                <button
+                  className="btn btn-sm btn-outline"
+                  onClick={() => handleListView(tipo.id)}
+                  title="Ver todos los formularios"
+                >
+                  <List size={16} />
+                  Ver
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="formularios-container">
@@ -684,36 +1647,38 @@ const Formularios = () => {
             <div className={`alert alert-${message.type}`}>
               {message.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
               <span>{message.text}</span>
-              <button onClick={() => setMessage({ type: '', text: '' })}>
-                <X size={18} />
-              </button>
             </div>
           )}
 
+          {view === 'dashboard' && renderDashboard()}
+
           {view === 'select' && (
-            <div className="formularios-grid">
-              {tiposFormularios.map((tipo) => (
-                <div key={tipo.id} className="formulario-card">
-                  <div className="card-icon">{tipo.icon}</div>
-                  <h3>{tipo.nombre}</h3>
-                  <div className="card-actions">
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => handleTypeSelect(tipo.id)}
-                    >
-                      <Plus size={18} />
-                      Crear
-                    </button>
-                    <button 
-                      className="btn btn-secondary"
-                      onClick={() => handleListView(tipo.id)}
-                    >
-                      <List size={18} />
-                      Listar
-                    </button>
+            <div className="select-section">
+              <h2>Selecciona el tipo de formulario</h2>
+              <div className="formularios-grid">
+                {tiposFormularios.map((tipo) => (
+                  <div key={tipo.id} className="formulario-card">
+                    <div className="card-icon" style={{color: tipo.color}}>{tipo.icon}</div>
+                    <h3>{tipo.nombre}</h3>
+                    <div className="card-actions">
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => handleTypeSelect(tipo.id)}
+                      >
+                        <Plus size={18} />
+                        Crear
+                      </button>
+                      <button
+                        className="btn btn-outline"
+                        onClick={() => handleListView(tipo.id)}
+                      >
+                        <List size={18} />
+                        Ver
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
@@ -721,12 +1686,16 @@ const Formularios = () => {
             <div className="form-section">
               <div className="form-header">
                 <h2>
-                  {tiposFormularios.find(t => t.id === selectedType)?.icon}{' '}
-                  {tiposFormularios.find(t => t.id === selectedType)?.nombre}
+                  {editMode ? '✏️ Editar' : '➕ Crear'} {tiposFormularios.find(t => t.id === selectedType)?.nombre}
                 </h2>
-                <button 
+                <button
                   className="btn btn-outline"
-                  onClick={() => setView('select')}
+                  onClick={() => {
+                    setView('dashboard');
+                    setEditMode(false);
+                    setEditingId(null);
+                    setFormData({});
+                  }}
                 >
                   <X size={18} />
                   Cancelar
@@ -737,30 +1706,26 @@ const Formularios = () => {
                 {renderFormFields()}
 
                 <div className="form-actions">
-                  <button 
-                    type="submit" 
-                    className="btn btn-success"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <span className="loading-spinner"></span>
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <Save size={18} />
-                        Guardar Formulario
-                      </>
-                    )}
-                  </button>
-                  <button 
-                    type="reset" 
-                    className="btn btn-secondary"
-                    onClick={() => setFormData({})}
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => {
+                      setView('dashboard');
+                      setEditMode(false);
+                      setEditingId(null);
+                      setFormData({});
+                    }}
                   >
                     <X size={18} />
-                    Limpiar
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={loading}
+                  >
+                    <Save size={18} />
+                    {loading ? 'Guardando...' : (editMode ? 'Actualizar' : 'Guardar')}
                   </button>
                 </div>
               </form>
@@ -771,13 +1736,12 @@ const Formularios = () => {
             <div className="list-section">
               <div className="list-header">
                 <h2>
-                  {tiposFormularios.find(t => t.id === selectedType)?.icon}{' '}
-                  {tiposFormularios.find(t => t.id === selectedType)?.nombre}
+                  📋 {tiposFormularios.find(t => t.id === selectedType)?.nombre}
                 </h2>
                 <div className="list-actions">
                   <div className="filter-group">
                     <Filter size={18} />
-                    <select 
+                    <select
                       className="filter-select"
                       value={filtroEstado}
                       onChange={(e) => setFiltroEstado(e.target.value)}
@@ -789,9 +1753,20 @@ const Formularios = () => {
                       <option value="RECHAZADO">Rechazados</option>
                     </select>
                   </div>
-                  <button 
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setView('create');
+                      setEditMode(false);
+                      setFormData({});
+                    }}
+                  >
+                    <Plus size={18} />
+                    Nuevo
+                  </button>
+                  <button
                     className="btn btn-outline"
-                    onClick={() => setView('select')}
+                    onClick={() => setView('dashboard')}
                   >
                     <ArrowLeft size={18} />
                     Volver
@@ -799,26 +1774,37 @@ const Formularios = () => {
                 </div>
               </div>
 
-              <div className="list-content">
+              <div className="table-container">
                 {loading ? (
                   <div className="loading-container">
-                    <span className="loading-spinner"></span>
-                    <p>Cargando formularios...</p>
+                    <div className="loading"></div>
+                    <p>Cargando...</p>
                   </div>
                 ) : getFormulariosFiltrados().length === 0 ? (
-                  <div className="alert alert-info">
-                    <AlertCircle size={20} />
-                    <span>No hay formularios {filtroEstado !== 'TODOS' ? `en estado ${filtroEstado}` : 'registrados'}</span>
+                  <div className="empty-state">
+                    <FileText size={48} />
+                    <h3>No hay formularios registrados</h3>
+                    <p>Crea tu primer formulario para comenzar</p>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        setView('create');
+                        setEditMode(false);
+                        setFormData({});
+                      }}
+                    >
+                      <Plus size={18} />
+                      Crear Formulario
+                    </button>
                   </div>
                 ) : (
-                  <div className="table-container">
-                    <table className="formularios-table">
+                  <div className="table-responsive">
+                    <table className="table">
                       <thead>
                         <tr>
                           <th>ID</th>
                           <th>Fecha</th>
                           <th>Estado</th>
-                          <th>Usuario</th>
                           <th>Detalles</th>
                           <th>Acciones</th>
                         </tr>
@@ -826,33 +1812,47 @@ const Formularios = () => {
                       <tbody>
                         {getFormulariosFiltrados().map((form) => (
                           <tr key={form.id}>
-                            <td><code>{form.id.substring(0, 8)}</code></td>
-                            <td>{new Date(form.fechaCorte || form.createdAt).toLocaleDateString('es-CO')}</td>
+                            <td>{form.id.substring(0, 8)}...</td>
                             <td>
-                              <span className={`badge badge-${form.estado?.toLowerCase() || 'borrador'}`}>
-                                {form.estado || 'BORRADOR'}
+                              {new Date(form.fechaCorte || form.createdAt).toLocaleDateString('es-CO')}
+                            </td>
+                            <td>
+                              <span className={`badge badge-${form.estado.toLowerCase()}`}>
+                                {form.estado}
                               </span>
                             </td>
-                            <td>{form.usuario?.nombre || 'N/A'}</td>
-                            <td className="detalles-cell">
-                              {form.mineral && <div><strong>Mineral:</strong> {form.mineral}</div>}
-                              {form.tipoParada && <div><strong>Tipo:</strong> {form.tipoParada}</div>}
-                              {form.horasOperativas && <div><strong>Horas:</strong> {form.horasOperativas}</div>}
-                              {form.horasParadas && <div><strong>Horas parada:</strong> {form.horasParadas}</div>}
+                            <td>
+                              {form.mineral || form.tipoParada || form.tipoMaquinaria || form.estadoOperativo || form.areaProduccion || 'Ver detalles'}
                             </td>
                             <td>
                               <div className="action-buttons">
+                                <button
+                                  className="btn-icon btn-info"
+                                  title="Ver detalles"
+                                  onClick={() => setModalFormulario(form)}
+                                >
+                                  <Eye size={16} />
+                                </button>
                                 {form.estado === 'BORRADOR' && (
-                                  <button 
-                                    className="btn-icon btn-primary" 
-                                    title="Enviar"
-                                    onClick={() => handleCambiarEstado(form.id, 'ENVIADO')}
-                                  >
-                                    <Send size={16} />
-                                  </button>
+                                  <>
+                                    <button
+                                      className="btn-icon btn-primary"
+                                      title="Editar"
+                                      onClick={() => handleEdit(form)}
+                                    >
+                                      <Edit size={16} />
+                                    </button>
+                                    <button
+                                      className="btn-icon btn-success"
+                                      title="Enviar"
+                                      onClick={() => handleCambiarEstado(form.id, 'ENVIADO')}
+                                    >
+                                      <Send size={16} />
+                                    </button>
+                                  </>
                                 )}
-                                <button 
-                                  className="btn-icon btn-danger" 
+                                <button
+                                  className="btn-icon btn-danger"
                                   title="Eliminar"
                                   onClick={() => handleDeleteFormulario(form.id)}
                                 >
@@ -871,6 +1871,70 @@ const Formularios = () => {
           )}
         </div>
       </main>
+
+      {modalFormulario && (
+        <div className="modal-overlay" onClick={() => setModalFormulario(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                <FileText size={24} />
+                Detalles del Formulario
+              </h3>
+              <button
+                className="btn-close"
+                onClick={() => setModalFormulario(null)}
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="detail-grid">
+                {Object.entries(modalFormulario).map(([key, value]) => {
+                  if (key === 'id' || key === 'usuarioId' || key === 'tituloMineroId' || key === 'usuario' || key === 'tituloMinero') {
+                    return null;
+                  }
+                  
+                  let displayValue = value;
+                  if (key.includes('fecha') || key.includes('Fecha') || key === 'createdAt' || key === 'updatedAt') {
+                    displayValue = value ? new Date(value).toLocaleString('es-CO') : 'N/A';
+                  } else if (typeof value === 'number') {
+                    displayValue = value.toLocaleString('es-CO');
+                  } else {
+                    displayValue = value?.toString() || 'N/A';
+                  }
+                  
+                  return (
+                    <div key={key} className="detail-item">
+                      <strong>{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</strong>
+                      <span>{displayValue}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="modal-footer">
+              {modalFormulario.estado === 'BORRADOR' && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    handleEdit(modalFormulario);
+                    setModalFormulario(null);
+                  }}
+                >
+                  <Edit size={18} />
+                  Editar
+                </button>
+              )}
+              <button
+                className="btn btn-secondary"
+                onClick={() => setModalFormulario(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
