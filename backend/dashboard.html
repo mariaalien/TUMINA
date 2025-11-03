@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Sistema ANM-FRI</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .chart-card h3 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .actions {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .actions h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Dashboard - Sistema ANM-FRI</h1>
+            <p>Panel de Control y Estadísticas</p>
+            <div id="userInfo" class="user-info" style="display: none;"></div>
+        </div>
+
+        <div class="actions">
+            </button>
+            <button onclick="window.location.href='test-all-fri.html'" class="btn btn-primary">
+                📝 Ir a Formularios
+            </button>
+            <button onclick="window.location.href='exportador.html'" class="btn btn-success">
+                📤 EXPORTADOR AVANZADO
+            </button>
+            <button onclick="logout()" class="btn btn-danger">
+                🚪 Cerrar Sesión
+            </button>
+        </div>
+
+        <div class="stats-grid" id="statsGrid">
+            <!-- Se llenará dinámicamente -->
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>📊 Producción por Mineral</h3>
+                <canvas id="chartMineral"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h3>📈 Estados de Formularios</h3>
+                <canvas id="chartEstados"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let authToken = localStorage.getItem('authToken');
+        let currentUser = null;
+
+        // Verificar autenticación al cargar
+        window.onload = async () => {
+            if (!authToken) {
+                alert('❌ Debes iniciar sesión primero');
+                window.location.href = 'test-all-fri.html';
+                return;
+            }
+
+            await cargarPerfil();
+            await cargarEstadisticas();
+        };
+
+        async function cargarPerfil() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/perfil`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentUser = data.usuario;
+                    const userInfo = document.getElementById('userInfo');
+                    userInfo.innerHTML = `
+                    <strong>👤 Usuario:</strong> ${currentUser.nombre} (${currentUser.rol})<br>
+                    <strong>📧 Email:</strong> ${currentUser.email}<br>
+                    <strong>🏔️ Título Minero:</strong> ${currentUser.tituloMinero?.numeroTitulo || 'N/A'} - ${currentUser.tituloMinero?.municipio || 'N/A'}
+                    <button onclick="window.location.href='dashboard.html'" class="btn btn-primary" style="margin-top: 10px; margin-right: 10px;">📊 DASHBOARD</button>
+                    <button onclick="logout()" class="btn btn-danger" style="margin-top: 10px;">🚪 CERRAR SESIÓN</button>
+                `;
+                    userInfo.style.display = 'block';
+                } else {
+                    throw new Error('Sesión inválida');
+                }
+
+            } catch (error) {
+                alert('❌ Error de autenticación. Por favor inicia sesión nuevamente.');
+                localStorage.removeItem('authToken');
+                window.location.href = 'test-all-fri.html';
+            }
+        }
+
+        async function cargarEstadisticas() {
+            try {
+                const response = await fetch(`${API_BASE}/dashboard/estadisticas-avanzadas`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    mostrarEstadisticas(data.estadisticas);
+                }
+
+            } catch (error) {
+                console.error('Error al cargar estadísticas:', error);
+                alert('❌ Error al cargar estadísticas');
+            }
+        }
+
+        function mostrarEstadisticas(stats) {
+            // Tarjetas de estadísticas
+            const statsGrid = document.getElementById('statsGrid');
+            const totalProduccion = stats.produccionPorMineral.reduce((sum, p) => sum + p.cantidad, 0);
+            const totalRegistros = stats.produccionPorMineral.reduce((sum, p) => sum + p.registros, 0);
+            const totalHoras = stats.produccionPorMineral.reduce((sum, p) => sum + p.horas, 0);
+
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <h3>📦 PRODUCCIÓN TOTAL</h3>
+                    <div class="number">${totalProduccion.toFixed(2)}</div>
+                    <p>Toneladas</p>
+                </div>
+                <div class="stat-card">
+                    <h3>📋 TOTAL REGISTROS</h3>
+                    <div class="number">${totalRegistros}</div>
+                    <p>Formularios</p>
+                </div>
+                <div class="stat-card">
+                    <h3>⏰ HORAS OPERATIVAS</h3>
+                    <div class="number">${totalHoras.toFixed(0)}</div>
+                    <p>Horas</p>
+                </div>
+                <div class="stat-card">
+                    <h3>⛏️ MINERALES</h3>
+                    <div class="number">${stats.produccionPorMineral.length}</div>
+                    <p>Tipos diferentes</p>
+                </div>
+            `;
+
+            // Gráfico de producción por mineral
+            crearGraficoMineral(stats.produccionPorMineral);
+
+            // Gráfico de estados
+            crearGraficoEstados(stats.estadosFormularios);
+        }
+
+        function crearGraficoMineral(data) {
+            const ctx = document.getElementById('chartMineral').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.mineral),
+                    datasets: [{
+                        label: 'Producción (Toneladas)',
+                        data: data.map(d => d.cantidad),
+                        backgroundColor: [
+                            '#667eea',
+                            '#764ba2',
+                            '#f093fb',
+                            '#4facfe',
+                            '#43e97b',
+                            '#fa709a'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function crearGraficoEstados(data) {
+            const ctx = document.getElementById('chartEstados').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.estado),
+                    datasets: [{
+                        data: data.map(d => d.cantidad),
+                        backgroundColor: [
+                            '#ffc107',
+                            '#17a2b8',
+                            '#28a745',
+                            '#dc3545'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true
+                }
+            });
+        }
+
+        async function descargarReporteProduccion() {
+    try {
+        const response = await fetch(`${API_BASE}/reportes/produccion/excel`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `reporte_produccion_${Date.now()}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+            alert('✅ Reporte descargado correctamente');
+        } else {
+            const error = await response.json();
+            alert('❌ Error: ' + error.message);
+        }
+    } catch (error) {
+        alert('❌ Error al descargar reporte: ' + error.message);
+    }
+}
+
+async function descargarReporteConsolidado() {
+    try {
+        const response = await fetch(`${API_BASE}/reportes/consolidado/excel`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `reporte_consolidado_${Date.now()}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+            alert('✅ Reporte consolidado descargado correctamente');
+        } else {
+            const error = await response.json();
+            alert('❌ Error: ' + error.message);
+        }
+    } catch (error) {
+        alert('❌ Error al descargar reporte: ' + error.message);
+    }
+}
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            window.location.href = 'test-all-fri.html';
+        }
+    </script>
+</body>
+</html>
