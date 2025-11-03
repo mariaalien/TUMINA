@@ -56,15 +56,12 @@ const Login = () => {
         <div className="login-card">
           <div className="login-header">
             <div className="login-logo">
-              <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-                <rect width="60" height="60" rx="12" fill="#2563eb"/>
-                <path d="M30 15L45 25V40L30 50L15 40V25L30 15Z" stroke="white" strokeWidth="3" fill="none"/>
-                <circle cx="30" cy="32" r="8" fill="white"/>
-              </svg>
+              <img src="/logo.png" alt="Logo TU MINA"l width="100" height="100"
+              style={{ borderRadius: '16px', objectFit: 'contain' }} />
             </div>
-            <h1>Sistema ANM-FRI</h1>
+            <h1>Sistema TU MINA</h1>
             <p>Agencia Nacional de Minería</p>
-            <p className="company">CTGlobal - Geovisor</p>
+            <p className="company">CTGlobal</p>
           </div>
 
           <form onSubmit={handleSubmit} className="login-form">
@@ -85,7 +82,7 @@ const Login = () => {
                 value={formData.email}
                 onChange={handleChange}
                 className="form-input"
-                placeholder="usuario@ejemplo.com"
+                placeholder="usuario@tumina.com"
                 required
                 disabled={loading}
               />
@@ -128,14 +125,10 @@ const Login = () => {
 
           <div className="login-footer">
             <p className="login-info">
-              💡 <strong>Usuarios de prueba:</strong>
+              💡 <strong>Nota:</strong>
             </p>
-            <div className="user-hints">
-              <span className="badge badge-info">carlos.fajardo@tumina.com</span>
-            </div>
-            <p className="login-hint">Contraseña: 123456</p>
             <p className="login-hint" style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#6b7280' }}>
-              Nota: Usa las credenciales de tu base de datos
+              En cumplimiento de la Resolución 371 de 2024
             </p>
           </div>
         </div>
@@ -146,8 +139,7 @@ const Login = () => {
             <li>✅ Gestión de formularios de recolección de información</li>
             <li>📊 Dashboard con análisis en tiempo real</li>
             <li>📥 Exportación de reportes en PDF y Excel</li>
-            <li>🔐 Sistema seguro con autenticación JWT</li>
-            <li>👥 Control de roles y permisos</li>
+            <li>👥 Control de roles y permisos de usuarios</li>
           </ul>
         </div>
       </div>

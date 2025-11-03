@@ -134,15 +134,12 @@ const Home = () => {
           <div className="header-content">
             <div className="header-left">
               <div className="logo">
-                <svg width="40" height="40" viewBox="0 0 60 60" fill="none">
-                  <rect width="60" height="60" rx="12" fill="#2563eb"/>
-                  <path d="M30 15L45 25V40L30 50L15 40V25L30 15Z" stroke="white" strokeWidth="3" fill="none"/>
-                  <circle cx="30" cy="32" r="8" fill="white"/>
-                </svg>
+                <img src="/logo.png" alt="Logo TU MINA" width="50" height="50"
+                 style={{ borderRadius: '8px', objectFit: 'contain' }} />
               </div>
               <div>
-                <h1>Sistema ANM-FRI</h1>
-                <p>CTGlobal - Geovisor</p>
+                <h1>TU MINA</h1>
+                <p>CTGlobal</p>
               </div>
             </div>
             
@@ -308,18 +305,6 @@ const Home = () => {
                   <li>✅ FRI Regalías (Trimestral)</li>
                 </ul>
               </div>
-              
-              <div className="card">
-                <h4>🎯 Funcionalidades Principales</h4>
-                <ul className="info-list">
-                  <li>🔐 Autenticación segura con JWT</li>
-                  <li>👥 Control de roles y permisos</li>
-                  <li>📊 Dashboard con gráficos interactivos</li>
-                  <li>📥 Exportación a PDF y Excel</li>
-                  <li>🔍 Filtros avanzados por fecha y tipo</li>
-                  <li>💾 Validación automática de datos</li>
-                </ul>
-              </div>
             </div>
           </section>
         </div>
@@ -328,7 +313,7 @@ const Home = () => {
       {/* Footer */}
       <footer className="home-footer">
         <div className="container">
-          <p>© 2025 Sistema ANM-FRI | CTGlobal - Geovisor | Agencia Nacional de Minería</p>
+          <p>© 2025 TU MINA | CTGlobal - Plataforma de gestión de datos | Agencia Nacional de Minería</p>
         </div>
       </footer>
     </div>
