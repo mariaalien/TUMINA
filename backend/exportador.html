@@ -765,22 +765,29 @@
     
     const extension = formato === 'pdf' ? 'pdf' : 'xlsx';
     
+    // ✅ AGREGAR ESTOS LOGS
+    const payload = {
+        tipos: Array.from(tiposSeleccionados),
+        filtros: construirFiltros()
+    };
+    
+    console.log('📤 PAYLOAD COMPLETO:', payload);
+    console.log('📤 Tipos:', payload.tipos);
+    console.log('📤 Filtros:', payload.filtros);
+    console.log('🌐 Endpoint:', endpoint);
+    
     try {
-        console.log('📤 Iniciando exportación...', { formato, tipos: Array.from(tiposSeleccionados), filtros: construirFiltros() });
-
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({
-                tipos: Array.from(tiposSeleccionados),
-                filtros: construirFiltros()
-            })
+            body: JSON.stringify(payload)  // ✅ Usar la variable payload
         });
 
-        console.log('📥 Respuesta:', response.status, response.statusText);
+        console.log('📥 Status:', response.status);
+        console.log('📥 Status Text:', response.statusText);
 
         if (response.ok) {
             const blob = await response.blob();
@@ -796,11 +803,12 @@
             alert(`✅ Archivo ${extension.toUpperCase()} descargado correctamente`);
         } else {
             const error = await response.json();
+            console.error('❌ Error del servidor:', error);
             alert('❌ Error: ' + error.message);
         }
 
     } catch (error) {
-        console.error('❌ Error:', error);
+        console.error('❌ Error completo:', error);
         alert('❌ Error al exportar: ' + error.message);
     }
 }

@@ -1611,6 +1611,14 @@ app.get('/api/titulos-mineros', async (req, res) => {
 // ==================== ENDPOINT EXPORTACIÓN ANM ====================
 
 // ==================== ENDPOINT EXPORTACIÓN ANM (CORREGIDO) ====================
+// ============================================
+// DESPUÉS (CORRECTO) ✅
+// ============================================
+// ==================== COPIAR Y PEGAR ESTE CÓDIGO EN server.js ====================
+// Busca el endpoint: app.post('/api/reportes/exportar-anm'
+// Reemplaza TODO el endpoint con este código
+// ==================================================================================
+
 app.post('/api/reportes/exportar-anm', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -1621,47 +1629,189 @@ app.post('/api/reportes/exportar-anm', async (req, res) => {
     const jwt = require('jsonwebtoken');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const { tipos, filtros } = req.body;
+    // ✅ SOLUCIÓN: Valores por defecto para evitar undefined
+    const { tipos = [], filtros = {} } = req.body || {};
 
     console.log('📤 Exportando:', { tipos, filtros });
 
-    // Construir filtros
+    // ✅ Validar que al menos haya un tipo seleccionado
+    if (tipos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe seleccionar al menos un tipo de formulario'
+      });
+    }
+
+    // ✅ Construir filtros de forma segura
     const whereClauses = {};
     
-    if (filtros.fechaInicio && filtros.fechaFin) {
+    // Manejo seguro de fechas
+    if (filtros && filtros.fechaInicio && filtros.fechaFin) {
       whereClauses.fechaCorte = {
         gte: new Date(filtros.fechaInicio),
         lte: new Date(filtros.fechaFin)
       };
-    } else if (filtros.fechaInicio) {
+    } else if (filtros && filtros.fechaInicio) {
       whereClauses.fechaCorte = { gte: new Date(filtros.fechaInicio) };
-    } else if (filtros.fechaFin) {
+    } else if (filtros && filtros.fechaFin) {
       whereClauses.fechaCorte = { lte: new Date(filtros.fechaFin) };
     }
 
-    if (filtros.tituloMineroId && filtros.tituloMineroId !== '') {
+    // Otros filtros opcionales
+    if (filtros && filtros.tituloMineroId && filtros.tituloMineroId !== '') {
       whereClauses.tituloMineroId = filtros.tituloMineroId;
     }
 
-    if (filtros.usuarioId && filtros.usuarioId !== '' && decoded.rol === 'ADMIN') {
+    if (filtros && filtros.mineral && filtros.mineral !== '') {
+      whereClauses.mineral = filtros.mineral;
+    }
+
+    if (filtros && filtros.estado && filtros.estado !== '') {
+      whereClauses.estado = filtros.estado;
+    }
+
+    // Filtro de usuario
+    if (filtros && filtros.usuarioId && filtros.usuarioId !== '' && decoded.rol === 'ADMIN') {
+      whereClauses.usuarioId = filtros.usuarioId;
+    } else if (decoded.rol !== 'ADMIN') {
+      // Si no es admin, solo ve sus datos
+      whereClauses.usuarioId = decoded.id;
+    }
+
+    // Recopilar datos por tipo
+    const datosPorTipo = {};
+    
+    for (const tipo of tipos) {
+      let modelo;
+      switch(tipo) {
+        case 'produccion': modelo = prisma.fRIProduccion; break;
+        case 'inventarios': modelo = prisma.fRIInventarios; break;
+        case 'paradas': modelo = prisma.fRIParadas; break;
+        case 'ejecucion': modelo = prisma.fRIEjecucion; break;
+        case 'maquinaria': modelo = prisma.fRIMaquinaria; break;
+        case 'regalias': modelo = prisma.fRIRegalias; break;
+        default: 
+          console.log(`⚠️ Tipo desconocido: ${tipo}`);
+          continue;
+      }
+
+      const datos = await modelo.findMany({
+        where: whereClauses,
+        include: {
+          usuario: { select: { nombre: true } },
+          tituloMinero: { select: { numeroTitulo: true, municipio: true } }
+        },
+        orderBy: { fechaCorte: 'desc' }
+      });
+
+      if (datos.length > 0) {
+        datosPorTipo[tipo] = datos;
+        console.log(`✅ ${tipo}: ${datos.length} registros encontrados`);
+      } else {
+        console.log(`⚠️ ${tipo}: Sin registros`);
+      }
+    }
+
+    // ✅ Validar que hay datos para exportar
+    if (Object.keys(datosPorTipo).length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontraron datos con los filtros especificados'
+      });
+    }
+
+    console.log(`📊 Total de tipos con datos: ${Object.keys(datosPorTipo).length}`);
+
+    // Generar Excel
+    const excelExporter = require('./services/simpleExporter');
+    const workbook = await excelExporter.generarExcelConsolidado(datosPorTipo);
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=FRI_ANM_${Date.now()}.xlsx`
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (error) {
+    console.error('❌ Error al generar Excel:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar Excel',
+      error: error.message
+    });
+  }
+});
+
+
+// ==================== ENDPOINT PARA PDF ====================
+// Si no tienes este endpoint, agrégalo después del de Excel
+// Si ya lo tienes, reemplázalo con este código
+// ===============================================================
+
+app.post('/api/reportes/exportar-pdf', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'Token no proporcionado' });
+    }
+
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // ✅ Valores por defecto
+    const { tipos = [], filtros = {} } = req.body || {};
+
+    console.log('📄 Exportando PDF:', { tipos, filtros });
+
+    // Validar
+    if (tipos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe seleccionar al menos un tipo de formulario'
+      });
+    }
+
+    // Construir filtros (igual que Excel)
+    const whereClauses = {};
+    
+    if (filtros && filtros.fechaInicio && filtros.fechaFin) {
+      whereClauses.fechaCorte = {
+        gte: new Date(filtros.fechaInicio),
+        lte: new Date(filtros.fechaFin)
+      };
+    } else if (filtros && filtros.fechaInicio) {
+      whereClauses.fechaCorte = { gte: new Date(filtros.fechaInicio) };
+    } else if (filtros && filtros.fechaFin) {
+      whereClauses.fechaCorte = { lte: new Date(filtros.fechaFin) };
+    }
+
+    if (filtros && filtros.tituloMineroId && filtros.tituloMineroId !== '') {
+      whereClauses.tituloMineroId = filtros.tituloMineroId;
+    }
+
+    if (filtros && filtros.mineral && filtros.mineral !== '') {
+      whereClauses.mineral = filtros.mineral;
+    }
+
+    if (filtros && filtros.estado && filtros.estado !== '') {
+      whereClauses.estado = filtros.estado;
+    }
+
+    if (filtros && filtros.usuarioId && filtros.usuarioId !== '' && decoded.rol === 'ADMIN') {
       whereClauses.usuarioId = filtros.usuarioId;
     } else if (decoded.rol !== 'ADMIN') {
       whereClauses.usuarioId = decoded.id;
     }
 
-    if (filtros.mineral && filtros.mineral !== '') {
-      whereClauses.mineral = filtros.mineral;
-    }
-
-    if (filtros.estado && filtros.estado !== '') {
-      whereClauses.estado = filtros.estado;
-    }
-
-    console.log('🔍 Filtros WHERE:', whereClauses);
-
     // Recopilar datos
     const datosPorTipo = {};
-
+    
     for (const tipo of tipos) {
       let modelo;
       switch(tipo) {
@@ -1677,45 +1827,37 @@ app.post('/api/reportes/exportar-anm', async (req, res) => {
       const datos = await modelo.findMany({
         where: whereClauses,
         include: {
-          usuario: { select: { nombre: true, email: true } },
-          tituloMinero: { 
-            select: { 
-              numeroTitulo: true, 
-              municipio: true,
-              codigoMunicipio: true
-            } 
-          }
+          usuario: { select: { nombre: true } },
+          tituloMinero: { select: { numeroTitulo: true, municipio: true } }
         },
-        orderBy: { fechaCorte: 'asc' }
+        orderBy: { fechaCorte: 'desc' }
       });
-
-      console.log(`📊 ${tipo}: ${datos.length} registros`);
 
       if (datos.length > 0) {
         datosPorTipo[tipo] = datos;
       }
     }
 
-    // Generar Excel
-    const workbook = await simpleExporter.exportarMultiples(datosPorTipo);
+    if (Object.keys(datosPorTipo).length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontraron datos con los filtros especificados'
+      });
+    }
 
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    );
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename=FRI_ANM_${Date.now()}.xlsx`
-    );
+    // Generar PDF
+    const pdfExporter = require('./services/pdfExporter');
+    const pdfBuffer = await pdfExporter.generarPDFConsolidado(datosPorTipo);
 
-    await workbook.xlsx.write(res);
-    res.end();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=FRI_ANM_${Date.now()}.pdf`);
+    res.send(pdfBuffer);
 
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ Error al generar PDF:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al exportar',
+      message: 'Error al generar PDF',
       error: error.message
     });
   }
