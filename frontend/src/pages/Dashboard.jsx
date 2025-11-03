@@ -70,10 +70,11 @@ const Dashboard = () => {
         { estado: 'Borradores', cantidad: 28 },
       ],
       ultimasParadas: [
-        { fecha: '2024-11-01', tipo: 'Mantenimiento', duracion: 4.5, motivo: 'Mantenimiento preventivo' },
-        { fecha: '2024-10-28', tipo: 'Falla', duracion: 8.0, motivo: 'Falla eléctrica' },
-        { fecha: '2024-10-25', tipo: 'Climática', duracion: 12.0, motivo: 'Lluvia intensa' },
-        { fecha: '2024-10-20', tipo: 'Administrativa', duracion: 2.0, motivo: 'Reunión de seguridad' },
+        { fecha: '2024-11-01', tipo: 'Mantenimiento', duracion: 4.5, motivo: 'Mantenimiento preventivo de equipos' },
+        { fecha: '2024-10-28', tipo: 'Falla', duracion: 8.0, motivo: 'Falla eléctrica en el sistema principal' },
+        { fecha: '2024-10-25', tipo: 'Climática', duracion: 12.0, motivo: 'Lluvia intensa impide operaciones' },
+        { fecha: '2024-10-20', tipo: 'Administrativa', duracion: 2.0, motivo: 'Reunión de seguridad obligatoria' },
+        { fecha: '2024-10-15', tipo: 'Mantenimiento', duracion: 3.0, motivo: 'Cambio de aceite en maquinaria' },
       ],
     };
   };
@@ -254,18 +255,26 @@ const Dashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {dashboardData.ultimasParadas.map((parada, index) => (
-                        <tr key={index}>
-                          <td>{parada.fecha}</td>
-                          <td>
-                            <span className={`badge badge-${parada.tipo.toLowerCase()}`}>
-                              {parada.tipo}
-                            </span>
+                      {dashboardData.ultimasParadas && dashboardData.ultimasParadas.length > 0 ? (
+                        dashboardData.ultimasParadas.map((parada, index) => (
+                          <tr key={index}>
+                            <td>{new Date(parada.fecha).toLocaleDateString('es-CO')}</td>
+                            <td>
+                              <span className={`badge badge-${parada.tipo.toLowerCase()}`}>
+                                {parada.tipo}
+                              </span>
+                            </td>
+                            <td>{parada.duracion}h</td>
+                            <td>{parada.motivo}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="4" style={{ textAlign: 'center', color: '#999' }}>
+                            No hay paradas registradas
                           </td>
-                          <td>{parada.duracion}h</td>
-                          <td>{parada.motivo}</td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
