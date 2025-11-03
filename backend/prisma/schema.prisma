@@ -191,7 +191,7 @@ model FRIInventarioMaquinaria {
   tipoMaquinaria  String
   marca           String?
   modelo          String?
-  anoFabricacion Int?
+  a_oFabricacion  Int?         @map("añoFabricacion")
   capacidad       Decimal?     @db.Decimal(10, 2)
   estadoOperativo String
   observaciones   String?

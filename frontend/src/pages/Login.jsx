@@ -21,26 +21,29 @@ const Login = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-    try {
-      const result = await authService.login(formData.email, formData.password);
-      if (result.success) {
-        navigate('/home');
-      } else {
-        setError(result.message || 'Error al iniciar sesión');
-      }
-    } catch (err) {
-      setError(
-        err.response?.data?.message || 
-        'Error al iniciar sesión. Verifica tus credenciales.'
-      );
-    } finally {
-      setLoading(false);
+  try {
+    const response = await authService.login(formData);
+    
+    if (response.data.success) {
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('usuario', JSON.stringify(response.data.usuario));
+      navigate('/home');
+    } else {
+      setError(response.data.message || 'Error al iniciar sesión');
     }
-  };
+  } catch (err) {
+    setError(
+      err.response?.data?.message || 
+      'Error al iniciar sesión. Verifica tus credenciales.'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="login-container">

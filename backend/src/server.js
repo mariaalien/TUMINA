@@ -8,10 +8,13 @@ const jwt = require('jsonwebtoken');
 // SERVICIOS
 const excelReports = require('./services/excelReports');
 const simpleExporter = require('./services/simpleExporter');
-const pdfExporter = require('./services/pdfExporter');
+
+// RUTAS - IMPORTAR (pero NO usar todavía)
+const reportRoutesSimple = require('./routes/reportRoutesSimple');
 
 dotenv.config();
 
+// ✅ AHORA SÍ SE CREA APP
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
@@ -20,22 +23,31 @@ const PORT = process.env.PORT || 5000;
 // MIDDLEWARE
 // ============================================
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // ============================================
+// REGISTRAR RUTAS (después de crear app y middleware)
+// ============================================
+app.use('/api/reports', reportRoutesSimple);
+
+// ============================================
 // RUTAS BÁSICAS
 // ============================================
-
 app.get('/', (req, res) => {
   res.json({ 
     mensaje: '🚀 Servidor ANM-FRI funcionando!',
     fecha: new Date().toISOString()
   });
 });
+
+// ... resto del código continúa igual
 
 app.get('/api/health', (req, res) => {
   res.json({ 

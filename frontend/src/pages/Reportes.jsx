@@ -1,381 +1,373 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { reportService } from '../services/api';
-import { ArrowLeft, Download, FileText, FileSpreadsheet, Filter, X } from 'lucide-react';
+import { authService, reportService } from '../services/api';
+import { 
+  ArrowLeft, 
+  Download, 
+  Eye,
+  FileSpreadsheet,
+  Calendar,
+  Filter,
+  AlertCircle,
+  CheckCircle,
+  User,
+  LogOut
+} from 'lucide-react';
 import './Reportes.css';
 
 const Reportes = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({
+  const [user] = useState(authService.getCurrentUser());
+  
+  const [filtros, setFiltros] = useState({
+    tipo: 'produccion',
     fechaInicio: '',
-    fechaFin: '',
-    tipoFormulario: [],
-    tipoMaterial: [],
-    formato: 'excel',
+    fechaFin: ''
   });
-  const [preview, setPreview] = useState(null);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  
+  const [preview, setPreview] = useState({
+    visible: false,
+    columnas: [],
+    registros: [],
+    total: 0
+  });
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const tiposFormularios = [
-    { id: 'produccion', nombre: 'FRI Producción', icon: '🏭' },
-    { id: 'inventarios', nombre: 'FRI Inventarios', icon: '📦' },
-    { id: 'paradas', nombre: 'FRI Paradas', icon: '⏸️' },
-    { id: 'ejecucion', nombre: 'FRI Ejecución', icon: '⚙️' },
-    { id: 'maquinaria', nombre: 'FRI Maquinaria', icon: '🚜' },
-    { id: 'regalias', nombre: 'FRI Regalías', icon: '💰' },
+    { value: 'produccion', label: 'Producción' },
+    { value: 'inventarios', label: 'Inventarios' },
+    { value: 'paradas', label: 'Paradas' },
+    { value: 'ejecucion', label: 'Ejecución' },
+    { value: 'maquinaria', label: 'Maquinaria' },
+    { value: 'regalias', label: 'Regalías' }
   ];
 
-  const tiposMateriales = [
-    { id: 'oro', nombre: 'Oro' },
-    { id: 'arena', nombre: 'Arena' },
-    { id: 'grava', nombre: 'Grava' },
-    { id: 'arcilla', nombre: 'Arcilla' },
-    { id: 'caliza', nombre: 'Caliza' },
-  ];
-
-  const handleFilterChange = (e) => {
+  const handleFiltroChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({
+    setFiltros(prev => ({
       ...prev,
-      [name]: value,
+      [name]: value
     }));
+    setError('');
+    setSuccess('');
   };
 
-  const handleCheckboxChange = (type, value) => {
-    setFilters(prev => {
-      const currentArray = prev[type];
-      const newArray = currentArray.includes(value)
-        ? currentArray.filter(item => item !== value)
-        : [...currentArray, value];
-      return {
-        ...prev,
-        [type]: newArray,
-      };
-    });
-  };
-
-  const handlePreview = () => {
-    // Simular vista previa
-    const mockData = {
-      totalRegistros: 156,
-      fechaInicio: filters.fechaInicio || '2024-01-01',
-      fechaFin: filters.fechaFin || '2024-11-02',
-      tiposIncluidos: filters.tipoFormulario.length || tiposFormularios.length,
-      materialesIncluidos: filters.tipoMaterial.length || tiposMateriales.length,
-    };
-    setPreview(mockData);
-  };
-
-  const handleExport = async () => {
-    setLoading(true);
-    setMessage({ type: '', text: '' });
-
+  const handleVistaPrevia = async () => {
     try {
-      let response;
-      const exportParams = {
-        fechaInicio: filters.fechaInicio,
-        fechaFin: filters.fechaFin,
-        tiposFormulario: filters.tipoFormulario.length ? filters.tipoFormulario : undefined,
-        tiposMaterial: filters.tipoMaterial.length ? filters.tipoMaterial : undefined,
-      };
+      setLoading(true);
+      setError('');
+      setSuccess('');
 
-      if (filters.formato === 'excel') {
-        response = await reportService.exportToExcel(exportParams);
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `reporte_FRI_${new Date().toISOString().split('T')[0]}.xlsx`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      } else {
-        response = await reportService.exportToPDF(exportParams);
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `reporte_FRI_${new Date().toISOString().split('T')[0]}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+      const response = await reportService.getPreview(filtros);
+
+      if (response.data.success) {
+        setPreview({
+          visible: true,
+          columnas: response.data.columnas,
+          registros: response.data.registros,
+          total: response.data.total
+        });
+        
+        if (response.data.total === 0) {
+          setError('No se encontraron registros con los filtros seleccionados');
+        } else {
+          setSuccess(`✓ Se encontraron ${response.data.total} registros`);
+        }
       }
-
-      setMessage({ 
-        type: 'success', 
-        text: `✅ Reporte exportado exitosamente en formato ${filters.formato.toUpperCase()}` 
-      });
-    } catch (error) {
-      setMessage({ 
-        type: 'error', 
-        text: 'Error al exportar reporte. Por favor intenta de nuevo.' 
-      });
-      console.error('Error exportando:', error);
+    } catch (err) {
+      console.error('Error en vista previa:', err);
+      setError(err.response?.data?.message || 'Error al cargar vista previa');
+      setPreview({ visible: false, columnas: [], registros: [], total: 0 });
     } finally {
       setLoading(false);
     }
   };
 
-  const clearFilters = () => {
-    setFilters({
+  const handleExportar = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+
+      const response = await reportService.exportarExcel(filtros);
+
+      const blob = new Blob([response.data], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const nombreArchivo = `FRI_${filtros.tipo}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.setAttribute('download', nombreArchivo);
+      
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      setSuccess(`✓ Archivo "${nombreArchivo}" descargado correctamente`);
+
+    } catch (err) {
+      console.error('Error exportando:', err);
+      setError(err.response?.data?.message || 'Error al exportar archivo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const limpiarFiltros = () => {
+    setFiltros({
+      tipo: 'produccion',
       fechaInicio: '',
-      fechaFin: '',
-      tipoFormulario: [],
-      tipoMaterial: [],
-      formato: 'excel',
+      fechaFin: ''
     });
-    setPreview(null);
+    setPreview({ visible: false, columnas: [], registros: [], total: 0 });
+    setError('');
+    setSuccess('');
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    navigate('/');
   };
 
   return (
     <div className="reportes-container">
-      <header className="page-header">
+      {/* Header igual que Home */}
+      <header className="reportes-header">
         <div className="container">
-          <button onClick={() => navigate('/home')} className="btn btn-outline">
-            <ArrowLeft size={18} />
-            Volver
-          </button>
-          <h1>📥 Exportar Reportes</h1>
+          <div className="header-content">
+            <div className="header-left">
+              <div className="logo">
+                <img src="/logo.png" alt="Logo TU MINA" width="50" height="50"
+                 style={{ borderRadius: '8px', objectFit: 'contain' }} />
+              </div>
+              <div>
+                <h1>TU MINA</h1>
+                <p>Desarrollado por CTGlobal</p>
+              </div>
+            </div>
+            
+            <div className="header-right">
+              <div className="user-info">
+                <div className="user-avatar">
+                  <User size={20} />
+                </div>
+                <div className="user-details">
+                  <p className="user-name">{user?.nombre || 'Usuario'}</p>
+                  <p className="user-role">{user?.rol || 'ROL'}</p>
+                </div>
+              </div>
+              
+              <button onClick={handleLogout} className="btn-logout">
+                <LogOut size={18} />
+                Salir
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="page-main">
+      {/* Main Content */}
+      <main className="reportes-main">
         <div className="container">
-          <div className="grid grid-2">
-            {/* Panel de Filtros */}
-            <div className="card fade-in">
-              <div className="card-header">
-                <h3>
-                  <Filter size={20} />
-                  Configurar Filtros
-                </h3>
-                <button 
-                  onClick={clearFilters}
-                  className="btn btn-outline btn-sm"
-                >
-                  <X size={16} />
-                  Limpiar
-                </button>
-              </div>
 
-              <div className="filters-content">
-                {/* Rango de Fechas */}
-                <div className="filter-section">
-                  <h4>📅 Rango de Fechas</h4>
-                  <div className="grid grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Fecha Inicio</label>
-                      <input
-                        type="date"
-                        name="fechaInicio"
-                        value={filters.fechaInicio}
-                        onChange={handleFilterChange}
-                        className="form-input"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Fecha Fin</label>
-                      <input
-                        type="date"
-                        name="fechaFin"
-                        value={filters.fechaFin}
-                        onChange={handleFilterChange}
-                        className="form-input"
-                      />
-                    </div>
-                  </div>
-                </div>
+          {/* Breadcrumb */}
+          <div className="breadcrumb">
+            <button onClick={() => navigate('/home')} className="breadcrumb-link">
+              <ArrowLeft size={18} />
+              Volver al Home
+            </button>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-current">Exportar Reportes</span>
+          </div>
 
-                {/* Tipos de Formularios */}
-                <div className="filter-section">
-                  <h4>📋 Tipos de Formularios</h4>
-                  <div className="checkbox-grid">
-                    {tiposFormularios.map((tipo) => (
-                      <label key={tipo.id} className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={filters.tipoFormulario.includes(tipo.id)}
-                          onChange={() => handleCheckboxChange('tipoFormulario', tipo.id)}
-                        />
-                        <span>{tipo.icon} {tipo.nombre}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {filters.tipoFormulario.length === 0 && (
-                    <p className="filter-note">Todos los tipos seleccionados</p>
-                  )}
-                </div>
+          {/* Page Title */}
+          <div className="page-title-section">
+            <div className="page-title-icon">
+              <FileSpreadsheet size={40} />
+            </div>
+            <div>
+              <h2 className="page-title">📥 Exportar Reportes ANM</h2>
+              <p className="page-subtitle">Genera reportes de tus formularios FRI en formato Excel</p>
+            </div>
+          </div>
 
-                {/* Tipos de Materiales */}
-                <div className="filter-section">
-                  <h4>⛏️ Tipos de Materiales</h4>
-                  <div className="checkbox-grid">
-                    {tiposMateriales.map((material) => (
-                      <label key={material.id} className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={filters.tipoMaterial.includes(material.id)}
-                          onChange={() => handleCheckboxChange('tipoMaterial', material.id)}
-                        />
-                        <span>{material.nombre}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {filters.tipoMaterial.length === 0 && (
-                    <p className="filter-note">Todos los materiales seleccionados</p>
-                  )}
-                </div>
+          {/* Mensajes */}
+          {error && (
+            <div className="alert alert-error">
+              <AlertCircle size={20} />
+              {error}
+            </div>
+          )}
 
-                {/* Formato de Exportación */}
-                <div className="filter-section">
-                  <h4>📄 Formato de Exportación</h4>
-                  <div className="radio-group">
-                    <label className="radio-label">
-                      <input
-                        type="radio"
-                        name="formato"
-                        value="excel"
-                        checked={filters.formato === 'excel'}
-                        onChange={handleFilterChange}
-                      />
-                      <FileSpreadsheet size={20} />
-                      <div>
-                        <strong>Excel</strong>
-                        <span>Formato simple con columnas ANM</span>
-                      </div>
-                    </label>
-                    <label className="radio-label">
-                      <input
-                        type="radio"
-                        name="formato"
-                        value="pdf"
-                        checked={filters.formato === 'pdf'}
-                        onChange={handleFilterChange}
-                      />
-                      <FileText size={20} />
-                      <div>
-                        <strong>PDF</strong>
-                        <span>Reporte ejecutivo con gráficos</span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
+          {success && (
+            <div className="alert alert-success">
+              <CheckCircle size={20} />
+              {success}
+            </div>
+          )}
 
-                <button 
-                  onClick={handlePreview}
-                  className="btn btn-outline"
-                  style={{ width: '100%' }}
-                >
-                  👁️ Vista Previa
-                </button>
-              </div>
+          {/* Filtros */}
+          <div className="card">
+            <div className="card-header">
+              <Filter size={24} />
+              <h3>Filtros de Exportación</h3>
             </div>
 
-            {/* Panel de Vista Previa y Exportación */}
-            <div className="card fade-in">
-              <h3>👁️ Vista Previa del Reporte</h3>
-
-              {message.text && (
-                <div className={`alert alert-${message.type}`}>
-                  {message.text}
-                </div>
-              )}
-
-              {preview ? (
-                <div className="preview-content">
-                  <div className="preview-stat">
-                    <div className="preview-icon">
-                      <FileText size={32} color="#2563eb" />
-                    </div>
-                    <div>
-                      <h2>{preview.totalRegistros}</h2>
-                      <p>Registros encontrados</p>
-                    </div>
-                  </div>
-
-                  <div className="preview-details">
-                    <div className="preview-item">
-                      <strong>📅 Período:</strong>
-                      <span>
-                        {new Date(preview.fechaInicio).toLocaleDateString()} -{' '}
-                        {new Date(preview.fechaFin).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="preview-item">
-                      <strong>📋 Tipos de formularios:</strong>
-                      <span>{preview.tiposIncluidos} tipo(s)</span>
-                    </div>
-                    <div className="preview-item">
-                      <strong>⛏️ Materiales:</strong>
-                      <span>{preview.materialesIncluidos} material(es)</span>
-                    </div>
-                    <div className="preview-item">
-                      <strong>📄 Formato:</strong>
-                      <span>{filters.formato.toUpperCase()}</span>
-                    </div>
-                  </div>
-
-                  <div className="export-info">
-                    <h4>ℹ️ Información del Reporte</h4>
-                    <ul>
-                      <li>✅ Los datos se exportarán según los filtros seleccionados</li>
-                      <li>✅ El formato {filters.formato.toUpperCase()} incluirá todos los campos requeridos</li>
-                      <li>✅ Los registros estarán ordenados por fecha</li>
-                      <li>✅ Se incluirán metadatos de auditoría</li>
-                    </ul>
-                  </div>
-
-                  <button 
-                    onClick={handleExport}
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
+            <div className="card-body">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>
+                    <FileSpreadsheet size={18} />
+                    Tipo de Formulario
+                  </label>
+                  <select
+                    name="tipo"
+                    value={filtros.tipo}
+                    onChange={handleFiltroChange}
+                    className="form-control"
                     disabled={loading}
                   >
-                    {loading ? (
-                      <>
-                        <span className="loading"></span>
-                        Generando reporte...
-                      </>
-                    ) : (
-                      <>
-                        <Download size={20} />
-                        Exportar Reporte
-                      </>
-                    )}
-                  </button>
+                    {tiposFormularios.map(tipo => (
+                      <option key={tipo.value} value={tipo.value}>
+                        {tipo.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ) : (
-                <div className="empty-preview">
-                  <FileText size={64} color="#e5e7eb" />
-                  <p>Configura los filtros y presiona "Vista Previa" para ver el resumen</p>
+
+                <div className="form-group">
+                  <label>
+                    <Calendar size={18} />
+                    Fecha Inicio
+                  </label>
+                  <input
+                    type="date"
+                    name="fechaInicio"
+                    value={filtros.fechaInicio}
+                    onChange={handleFiltroChange}
+                    className="form-control"
+                    disabled={loading}
+                  />
                 </div>
-              )}
+
+                <div className="form-group">
+                  <label>
+                    <Calendar size={18} />
+                    Fecha Fin
+                  </label>
+                  <input
+                    type="date"
+                    name="fechaFin"
+                    value={filtros.fechaFin}
+                    onChange={handleFiltroChange}
+                    className="form-control"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div className="card-actions">
+                <button 
+                  onClick={handleVistaPrevia} 
+                  className="btn btn-secondary"
+                  disabled={loading}
+                >
+                  <Eye size={20} />
+                  {loading ? 'Cargando...' : 'Vista Previa'}
+                </button>
+
+                <button 
+                  onClick={limpiarFiltros} 
+                  className="btn btn-outline"
+                  disabled={loading}
+                >
+                  Limpiar Filtros
+                </button>
+
+                <button 
+                  onClick={handleExportar} 
+                  className="btn btn-primary"
+                  disabled={loading || preview.total === 0}
+                >
+                  <Download size={20} />
+                  Exportar a Excel
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Información Adicional */}
-          <div className="card fade-in" style={{ marginTop: '2rem' }}>
-            <h3>💡 Guía de Exportación</h3>
-            <div className="grid grid-2">
-              <div>
-                <h4>📊 Formato Excel</h4>
-                <ul className="info-list">
-                  <li>Incluye todas las columnas definidas por ANM</li>
-                  <li>Datos listos para análisis y procesamiento</li>
-                  <li>Compatible con Microsoft Excel y Google Sheets</li>
-                  <li>Ideal para reportes técnicos y auditorías</li>
-                </ul>
+          {/* Vista Previa */}
+          {preview.visible && (
+            <div className="card">
+              <div className="card-header">
+                <Eye size={24} />
+                <h3>Vista Previa de Datos</h3>
+                <span className="badge">{preview.total} registros</span>
               </div>
-              <div>
-                <h4>📄 Formato PDF</h4>
-                <ul className="info-list">
-                  <li>Reporte ejecutivo con diseño profesional</li>
-                  <li>Incluye gráficos y visualizaciones</li>
-                  <li>Resumen estadístico del período</li>
-                  <li>Ideal para presentaciones y entregas formales</li>
-                </ul>
+
+              <div className="card-body">
+                {preview.registros.length > 0 ? (
+                  <div className="table-wrapper">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          {preview.columnas.map((columna, index) => (
+                            <th key={index}>{columna}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {preview.registros.map((registro, rowIndex) => (
+                          <tr key={rowIndex}>
+                            {Object.values(registro).map((valor, colIndex) => (
+                              <td key={colIndex}>
+                                {valor !== null && valor !== undefined ? String(valor) : '-'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <AlertCircle size={48} />
+                    <p>No se encontraron registros</p>
+                  </div>
+                )}
+
+                {preview.total > 100 && (
+                  <div className="info-note">
+                    <AlertCircle size={16} />
+                    <span>Se muestran los primeros 100 registros. Al exportar se incluirán todos los {preview.total} registros.</span>
+                  </div>
+                )}
               </div>
             </div>
+          )}
+
+          {/* Instrucciones */}
+          <div className="card info-card">
+            <div className="card-header">
+              <h3>📋 Instrucciones</h3>
+            </div>
+            <div className="card-body">
+              <ol className="instruction-list">
+                <li>Selecciona el tipo de formulario que deseas exportar</li>
+                <li>Opcionalmente, filtra por rango de fechas</li>
+                <li>Presiona "Vista Previa" para verificar los datos</li>
+                <li>Presiona "Exportar a Excel" para descargar el archivo</li>
+              </ol>
+            </div>
           </div>
+
         </div>
       </main>
     </div>

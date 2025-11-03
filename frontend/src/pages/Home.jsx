@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authService, reportService } from '../services/api';
+import { authService, friService } from '../services/api';
 import { 
   FileText, 
   BarChart3, 
@@ -11,21 +11,35 @@ import {
   Calendar,
   TrendingUp,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Edit,
+  Send,
+  Package,
+  PauseCircle,
+  Settings,
+  Truck,
+  DollarSign,
+  Layers,
+  Zap
 } from 'lucide-react';
 import './Home.css';
 
 const Home = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [stats, setStats] = useState(null);
-  const [borradoresCount, setBorradoresCount] = useState(0);
+  const [stats, setStats] = useState({
+    totalFormularios: 0,
+    borradores: 0,
+    enviados: 0,
+    aprobados: 0,
+    rechazados: 0,
+    porTipo: {}
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadUserData();
-    loadStats();
-    loadBorradores();
+    loadAllStats();
   }, []);
 
   const loadUserData = () => {
@@ -33,55 +47,62 @@ const Home = () => {
     setUser(currentUser);
   };
 
-  const loadStats = async () => {
+  const loadAllStats = async () => {
     try {
-      const response = await reportService.getDashboardStats();
-      setStats(response.data);
+      setLoading(true);
+      
+      // Tipos de formularios FRI
+      const tipos = [
+        'produccion',
+        'inventarios', 
+        'paradas',
+        'ejecucion',
+        'maquinaria',
+        'regalias',
+        'capacidad'
+      ];
+
+      const statsData = {
+        totalFormularios: 0,
+        borradores: 0,
+        enviados: 0,
+        aprobados: 0,
+        rechazados: 0,
+        porTipo: {}
+      };
+
+      // Cargar datos de cada tipo
+      for (const tipo of tipos) {
+        try {
+          const serviceMethod = `get${tipo.charAt(0).toUpperCase() + tipo.slice(1)}`;
+          const response = await friService[serviceMethod]();
+          
+          if (response.data.success && response.data.fris) {
+            const fris = response.data.fris;
+            const count = fris.length;
+            
+            statsData.totalFormularios += count;
+            statsData.porTipo[tipo] = count;
+            
+            // Contar por estado
+            fris.forEach(fri => {
+              if (fri.estado === 'BORRADOR') statsData.borradores++;
+              else if (fri.estado === 'ENVIADO') statsData.enviados++;
+              else if (fri.estado === 'APROBADO') statsData.aprobados++;
+              else if (fri.estado === 'RECHAZADO') statsData.rechazados++;
+            });
+          }
+        } catch (error) {
+          console.error(`Error cargando ${tipo}:`, error);
+          statsData.porTipo[tipo] = 0;
+        }
+      }
+
+      setStats(statsData);
     } catch (error) {
       console.error('Error cargando estadísticas:', error);
-      // Datos de ejemplo si falla la petición
-      setStats({
-        totalFormularios: 245,
-        formulariosPendientes: 12,
-        formulariosAprobados: 198,
-        formulariosMes: 45,
-      });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadBorradores = async () => {
-    try {
-      const response = await friService.getBorradoresCount();
-      if (response.data.success) {
-        setBorradoresCount(response.data.total);
-      }
-    } catch (error) {
-      console.error('Error cargando borradores:', error);
-    }
-  };
-
-  const handleEnviarBorradores = async () => {
-    if (borradoresCount === 0) {
-      return;
-    }
-
-    const confirmar = window.confirm(
-      `¿Estás seguro de que deseas ENVIAR todos los ${borradoresCount} borradores?\n\n` +
-      'Esto cambiará su estado y ya no podrás editarlos.'
-    );
-
-    if (!confirmar) return;
-
-    try {
-      const response = await friService.enviarBorradores();
-      if (response.data.success) {
-        alert('✅ ' + response.data.message);
-        loadBorradores();
-      }
-    } catch (error) {
-      alert('❌ Error al enviar borradores: ' + error.message);
     }
   };
 
@@ -93,8 +114,8 @@ const Home = () => {
   const quickActions = [
     {
       icon: <FileText size={32} />,
-      title: 'Llenar Formularios',
-      description: 'Crear y gestionar formularios FRI',
+      title: 'Formatos de Registro de Información',
+      description: 'Crear y gestionar formularios',
       path: '/formularios',
       color: '#2563eb',
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -117,11 +138,21 @@ const Home = () => {
     },
   ];
 
+  const tiposFormularios = [
+    { id: 'produccion', nombre: 'Producción', icon: <FileText size={20} />, color: '#3b82f6' },
+    { id: 'inventarios', nombre: 'Inventarios', icon: <Package size={20} />, color: '#10b981' },
+    { id: 'paradas', nombre: 'Paradas', icon: <PauseCircle size={20} />, color: '#ef4444' },
+    { id: 'ejecucion', nombre: 'Ejecución', icon: <Settings size={20} />, color: '#f59e0b' },
+    { id: 'maquinaria', nombre: 'Maquinaria', icon: <Truck size={20} />, color: '#8b5cf6' },
+    { id: 'regalias', nombre: 'Regalías', icon: <DollarSign size={20} />, color: '#ec4899' },
+    { id: 'capacidad', nombre: 'Capacidad', icon: <Zap size={20} />, color: '#84cc16' }
+  ];
+
   if (loading) {
     return (
       <div className="loading-container">
         <div className="loading"></div>
-        <p>Cargando...</p>
+        <p>Cargando datos reales...</p>
       </div>
     );
   }
@@ -139,7 +170,7 @@ const Home = () => {
               </div>
               <div>
                 <h1>TU MINA</h1>
-                <p>CTGlobal</p>
+                <p>Desarrollado por CTGlobal</p>
               </div>
             </div>
             
@@ -150,12 +181,11 @@ const Home = () => {
                 </div>
                 <div className="user-details">
                   <p className="user-name">{user?.nombre || 'Usuario'}</p>
-                  <span className={`badge badge-${user?.rol?.toLowerCase() || 'info'}`}>
-                    {user?.rol || 'OPERADOR'}
-                  </span>
+                  <p className="user-role">{user?.rol || 'ROL'}</p>
                 </div>
               </div>
-              <button onClick={handleLogout} className="btn btn-outline btn-logout">
+              
+              <button onClick={handleLogout} className="btn-logout">
                 <LogOut size={18} />
                 Salir
               </button>
@@ -167,155 +197,126 @@ const Home = () => {
       {/* Main Content */}
       <main className="home-main">
         <div className="container">
+          
           {/* Welcome Section */}
-          <section className="welcome-section fade-in">
+          <section className="welcome-section">
             <div className="welcome-card">
               <div className="welcome-content">
-                <h2>👋 ¡Bienvenido, {user?.nombre}!</h2>
-                <p>Gestiona los formularios de recolección de información de la Agencia Nacional de Minería</p>
-                <div className="welcome-meta">
-                  <span>
-                    <Building2 size={16} />
-                    {user?.tituloMinero?.numeroTitulo || 'Sin título asignado'}
-                  </span>
-                  <span>
-                    <Building2 size={16} />
-                    {user?.tituloMinero?.municipio || 'N/A'}
-                  </span>
-                  <span>
-                    <Calendar size={16} />
-                    {new Date().toLocaleDateString('es-CO', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                  </span>
+                <h2>¡Bienvenido, {user?.nombre?.split(' ')[0]}! 👋</h2>
+                <p>Sistema de Formularios de Recolección de Información (FRI) - Agencia Nacional de Minería</p>
+                <div className="welcome-date">
+                  <Calendar size={16} />
+                  <span>{new Date().toLocaleDateString('es-CO', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}</span>
                 </div>
               </div>
             </div>
-
-            {/* Alerta de Borradores */}
-            {borradoresCount > 0 && (
-              <div className="card" style={{ 
-                background: '#fff3cd', 
-                border: '2px solid #ffc107',
-                marginTop: '1rem'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong>📝 Borradores pendientes:</strong> {borradoresCount}
-                    <p style={{ margin: '0.5rem 0 0 0', color: '#856404' }}>
-                      Tienes formularios en estado borrador que aún no has enviado
-                    </p>
-                  </div>
-                  <button 
-                    onClick={handleEnviarBorradores}
-                    className="btn btn-primary"
-                  >
-                    📤 Enviar Todos
-                  </button>
-                </div>
-              </div>
-            )}
           </section>
 
-          {/* Stats Cards */}
-          <section className="stats-section fade-in">
-            <h3 className="section-title">📊 Resumen General</h3>
-            <div className="grid grid-4">
-              <div className="stat-card" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                <div className="stat-icon">
-                  <FileText size={24} />
-                </div>
-                <div className="stat-info">
-                  <h4>{stats?.totalFormularios || 0}</h4>
-                  <p>Total Formularios</p>
-                </div>
-              </div>
+          {/* Stats Section - DATOS REALES */}
+          <section className="stats-section">
+            <h3 className="section-title">📊 Resumen General de Formularios</h3>
+            <div className="stats-grid">
               
-              <div className="stat-card" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
-                <div className="stat-icon">
-                  <AlertCircle size={24} />
+              {/* Total Formularios */}
+              <div className="stat-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+                <div className="stat-icon" style={{ background: '#dbeafe' }}>
+                  <FileText size={28} color="#3b82f6" />
                 </div>
-                <div className="stat-info">
-                  <h4>{stats?.formulariosPendientes || 0}</h4>
-                  <p>Pendientes</p>
-                </div>
-              </div>
-              
-              <div className="stat-card" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
-                <div className="stat-icon">
-                  <CheckCircle size={24} />
-                </div>
-                <div className="stat-info">
-                  <h4>{stats?.formulariosAprobados || 0}</h4>
-                  <p>Aprobados</p>
+                <div className="stat-content">
+                  <p className="stat-label">Total Formularios</p>
+                  <h3 className="stat-value">{stats.totalFormularios}</h3>
+                  <p className="stat-desc">En toda la plataforma</p>
                 </div>
               </div>
-              
-              <div className="stat-card" style={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' }}>
-                <div className="stat-icon">
-                  <TrendingUp size={24} />
+
+              {/* Borradores */}
+              <div className="stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+                <div className="stat-icon" style={{ background: '#fef3c7' }}>
+                  <Edit size={28} color="#f59e0b" />
                 </div>
-                <div className="stat-info">
-                  <h4>{stats?.formulariosMes || 0}</h4>
-                  <p>Este Mes</p>
+                <div className="stat-content">
+                  <p className="stat-label">Borradores</p>
+                  <h3 className="stat-value">{stats.borradores}</h3>
+                  <p className="stat-desc">Pendientes de enviar</p>
                 </div>
               </div>
+
+              {/* Enviados */}
+              <div className="stat-card" style={{ borderLeft: '4px solid #06b6d4' }}>
+                <div className="stat-icon" style={{ background: '#cffafe' }}>
+                  <Send size={28} color="#06b6d4" />
+                </div>
+                <div className="stat-content">
+                  <p className="stat-label">Enviados</p>
+                  <h3 className="stat-value">{stats.enviados}</h3>
+                  <p className="stat-desc">En revisión</p>
+                </div>
+              </div>
+
+              {/* Aprobados */}
+              <div className="stat-card" style={{ borderLeft: '4px solid #10b981' }}>
+                <div className="stat-icon" style={{ background: '#d1fae5' }}>
+                  <CheckCircle size={28} color="#10b981" />
+                </div>
+                <div className="stat-content">
+                  <p className="stat-label">Aprobados</p>
+                  <h3 className="stat-value">{stats.aprobados}</h3>
+                  <p className="stat-desc">Completados</p>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          {/* Formularios por Tipo - DATOS REALES */}
+          <section className="types-section">
+            <h3 className="section-title">📝 Formularios por Tipo</h3>
+            <div className="types-grid">
+              {tiposFormularios.map((tipo) => (
+                <div key={tipo.id} className="type-card">
+                  <div className="type-icon" style={{ background: `${tipo.color}20`, color: tipo.color }}>
+                    {tipo.icon}
+                  </div>
+                  <div className="type-content">
+                    <h4>{tipo.nombre}</h4>
+                    <p className="type-count">
+                      <strong>{stats.porTipo[tipo.id] || 0}</strong> registros
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
 
           {/* Quick Actions */}
-          <section className="actions-section fade-in">
-            <h3 className="section-title">⚡ Accesos Rápidos</h3>
-            <div className="grid grid-3">
+          <section className="actions-section">
+            <h3 className="section-title">🚀 Acciones Rápidas</h3>
+            <div className="actions-grid">
               {quickActions.map((action, index) => (
                 <div
                   key={index}
                   className="action-card"
                   onClick={() => navigate(action.path)}
-                  style={{ 
-                    '--gradient': action.gradient,
-                    animationDelay: `${index * 0.1}s`
-                  }}
+                  style={{ background: action.gradient }}
                 >
-                  <div className="action-icon" style={{ color: action.color }}>
-                    {action.icon}
+                  <div className="action-icon">{action.icon}</div>
+                  <div className="action-content">
+                    <h4>{action.title}</h4>
+                    <p>{action.description}</p>
                   </div>
-                  <h4>{action.title}</h4>
-                  <p>{action.description}</p>
                   <div className="action-arrow">→</div>
                 </div>
               ))}
             </div>
           </section>
 
-          {/* Info Section */}
-          <section className="info-section fade-in">
-            <div className="grid grid-2">
-              <div className="card">
-                <h4>📋 Tipos de Formularios Disponibles</h4>
-                <ul className="info-list">
-                  <li>✅ FRI Producción (Mensual)</li>
-                  <li>✅ FRI Inventarios (Mensual)</li>
-                  <li>✅ FRI Paradas de Producción</li>
-                  <li>✅ FRI Ejecución (Mensual)</li>
-                  <li>✅ FRI Utilización de Maquinaria</li>
-                  <li>✅ FRI Regalías (Trimestral)</li>
-                </ul>
-              </div>
-            </div>
-          </section>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="home-footer">
-        <div className="container">
-          <p>© 2025 TU MINA | CTGlobal - Plataforma de gestión de datos | Agencia Nacional de Minería</p>
-        </div>
-      </footer>
     </div>
   );
 };

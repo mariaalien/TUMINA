@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { friService } from '../services/api';
+import { authService, friService } from '../services/api';
 import { 
   Plus, 
   List, 
@@ -24,12 +24,14 @@ import {
   DollarSign,
   Layers,
   Zap,
-  TrendingUp
+  TrendingUp,
+  User, LogOut,
 } from 'lucide-react';
 import './Formularios.css';
 
 const Formularios = () => {
   const navigate = useNavigate();
+  const [usuario] = useState(authService.getCurrentUser());
   const [view, setView] = useState('dashboard');
   const [selectedType, setSelectedType] = useState('');
   const [formData, setFormData] = useState({});
@@ -1619,24 +1621,37 @@ const Formularios = () => {
 
   return (
     <div className="formularios-container">
-      <header className="page-header">
+     {/* Header */}
+      <header className="formularios-header">
         <div className="container">
-          <button onClick={() => navigate('/home')} className="btn btn-outline">
-            <ArrowLeft size={18} />
-            Volver
-          </button>
           <div className="header-content">
-            <h1>📝 Gestión de Formularios FRI</h1>
-            {borradoresCount > 0 && (
-              <button 
-                className="btn btn-warning"
-                onClick={handleEnviarBorradores}
-                disabled={loading}
-              >
-                <Send size={18} />
-                Enviar {borradoresCount} Borrador{borradoresCount > 1 ? 'es' : ''}
+            <div className="header-left">
+              <div className="logo">
+                <img src="/logo.png" alt="Logo TU MINA" width="50" height="50"
+                 style={{ borderRadius: '8px', objectFit: 'contain' }} />
+              </div>
+              <div>
+                <h1>TU MINA</h1>
+                <p>Desarrollado por CTGlobal</p>
+              </div>
+            </div>
+            
+            <div className="header-right">
+              <div className="user-info">
+                <div className="user-avatar">
+                  <User size={20} />
+                </div>
+                <div className="user-details">
+                  <p className="user-name">{usuario?.nombre || 'Usuario'}</p>
+                  <p className="user-role">{usuario?.rol || 'ROL'}</p>
+                </div>
+              </div>
+              
+              <button onClick={handleLogout} className="btn-logout">
+                <LogOut size={18} />
+                Salir
               </button>
-            )}
+            </div>
           </div>
         </div>
       </header>

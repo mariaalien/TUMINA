@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { authService } from './services/api';
 
 // Pages
 import Login from './pages/Login';
@@ -11,7 +10,7 @@ import Reportes from './pages/Reportes';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-  const isAuthenticated = authService.isAuthenticated();
+  const isAuthenticated = !!localStorage.getItem('token');
   
   if (!isAuthenticated) {
     return <Navigate to="/" replace />;
@@ -21,6 +20,11 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  // Función para verificar autenticación
+  const isAuthenticated = () => {
+    return !!localStorage.getItem('token');
+  };
+
   return (
     <Router>
       <Routes>
@@ -66,7 +70,7 @@ function App() {
           path="*"
           element={
             <Navigate 
-              to={authService.isAuthenticated() ? "/home" : "/"} 
+              to={isAuthenticated() ? "/home" : "/"} 
               replace 
             />
           }

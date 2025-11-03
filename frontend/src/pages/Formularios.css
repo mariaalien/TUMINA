@@ -1,49 +1,224 @@
-/* ==================== CONTENEDOR PRINCIPAL ==================== */
-.formularios-container {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
-  background-size: 400% 400%;
-  animation: gradientShift 15s ease infinite;
-}
-
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-/* ==================== HEADER ==================== */
-.page-header {
+/* ============================================
+   HEADER MEJORADO
+   ============================================ */
+.dashboard-header {
   background: white;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  padding: 1.5rem 0;
   position: sticky;
   top: 0;
   z-index: 100;
 }
 
-.page-header .container {
+.dashboard-header .container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  padding: 0 24px;
 }
 
 .header-content {
   display: flex;
-  align-items: center;
-  gap: 2rem;
-  flex: 1;
   justify-content: space-between;
-  margin-left: 2rem;
+  align-items: center;
+  padding: 16px 0;
 }
 
-.header-content h1 {
-  margin: 0;
-  font-size: 1.75rem;
-  color: #1f2937;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo img {
+  border-radius: 8px;
+}
+
+.header-left h1 {
+  font-size: 24px;
   font-weight: 700;
+  color: #4299e1;
+  margin: 0;
+}
+
+.header-left p {
+  font-size: 13px;
+  color: #718096;
+  margin: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-name {
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0;
+  font-size: 14px;
+}
+
+.user-role {
+  font-size: 12px;
+  color: #718096;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.btn-logout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  color: #718096;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-logout:hover {
+  background: #fee;
+  border-color: #f56565;
+  color: #f56565;
+}
+
+/* ============================================
+   FIN HEADER - CONTINÚA EL CSS ORIGINAL
+   ============================================ */
+/* ============================================
+   HEADER MEJORADO
+   ============================================ */
+.formularios-header {
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.formularios-header .container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo img {
+  border-radius: 8px;
+}
+
+.header-left h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #4299e1;
+  margin: 0;
+}
+
+.header-left p {
+  font-size: 13px;
+  color: #718096;
+  margin: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-name {
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0;
+  font-size: 14px;
+}
+
+.user-role {
+  font-size: 12px;
+  color: #718096;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.btn-logout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  color: #718096;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-logout:hover {
+  background: #fee;
+  border-color: #f56565;
+  color: #f56565;
 }
 
 /* ==================== MAIN CONTENT ==================== */

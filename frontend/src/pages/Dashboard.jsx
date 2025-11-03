@@ -1,295 +1,495 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { reportService } from '../services/api';
-import { ArrowLeft, TrendingUp, TrendingDown, Activity } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
+import { friService } from '../services/api';
+import { 
+  ArrowLeft,
+  Activity,
+  TrendingDown,
+  Package,
+  AlertCircle,
+  Clock,
   PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
+  Calendar,
+  User, LogOut, BarChart3, TrendingUp, 
+} from 'lucide-react';
+import { 
+  LineChart, Line, BarChart, Bar, PieChart as RechartsPie, Pie, 
+  Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import './Dashboard.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState(null);
+  const [dashboardData, setDashboardData] = useState({
+    kpis: {
+      totalProduccion: 0,
+      totalInventario: 0,
+      totalParadas: 0,
+      eficiencia: 0,
+      horasOperativas: 0
+    },
+    produccionPorMes: [],
+    distribucionMinerales: [],
+    estadosFormularios: [],
+    ultimasParadas: [],
+    produccionPorMineral: []
+  });
 
   useEffect(() => {
-    loadDashboardData();
+    cargarDatosReales();
   }, []);
 
-  const loadDashboardData = async () => {
+  const cargarDatosReales = async () => {
     try {
-      const response = await reportService.getDashboardStats();
-      setDashboardData(response.data);
+      setLoading(true);
+
+      // Cargar datos de todas las tablas
+      const [produccion, inventarios, paradas, maquinaria] = await Promise.all([
+        friService.getProduccion().catch(() => ({ data: { fris: [] } })),
+        friService.getInventarios().catch(() => ({ data: { fris: [] } })),
+        friService.getParadas().catch(() => ({ data: { fris: [] } })),
+        friService.getMaquinaria().catch(() => ({ data: { fris: [] } }))
+      ]);
+
+      const datosProduccion = produccion.data.fris || [];
+      const datosInventarios = inventarios.data.fris || [];
+      const datosParadas = paradas.data.fris || [];
+      const datosMaquinaria = maquinaria.data.fris || [];
+
+      // ========================================
+      // 1. CALCULAR KPIs REALES
+      // ========================================
+      
+      // Producción total
+      const totalProduccion = datosProduccion.reduce((sum, p) => {
+        return sum + (parseFloat(p.cantidadProduccion) || 0);
+      }, 0);
+
+      // Inventario total (suma de inventarios finales)
+      const totalInventario = datosInventarios.reduce((sum, inv) => {
+        return sum + (parseFloat(inv.inventarioFinalAcopio) || 0);
+      }, 0);
+
+      // Total de paradas
+      const totalParadas = datosParadas.length;
+
+      // Horas operativas totales
+      const horasOperativas = datosProduccion.reduce((sum, p) => {
+        return sum + (parseFloat(p.horasOperativas) || 0);
+      }, 0);
+
+      // Calcular eficiencia (producción / horas * 100)
+      const eficiencia = horasOperativas > 0 
+        ? ((totalProduccion / horasOperativas) * 100).toFixed(1)
+        : 0;
+
+      // ========================================
+      // 2. PRODUCCIÓN POR MINERAL
+      // ========================================
+      
+      const produccionPorMineral = {};
+      datosProduccion.forEach(p => {
+        const mineral = p.mineral || 'Sin especificar';
+        if (!produccionPorMineral[mineral]) {
+          produccionPorMineral[mineral] = 0;
+        }
+        produccionPorMineral[mineral] += parseFloat(p.cantidadProduccion) || 0;
+      });
+
+      const distribucionMinerales = Object.keys(produccionPorMineral).map(mineral => ({
+        nombre: mineral,
+        valor: parseFloat(produccionPorMineral[mineral].toFixed(2)),
+        porcentaje: totalProduccion > 0 
+          ? ((produccionPorMineral[mineral] / totalProduccion) * 100).toFixed(1)
+          : 0
+      }));
+
+      // ========================================
+      // 3. PRODUCCIÓN POR MES (últimos 6 meses)
+      // ========================================
+      
+      const produccionPorMes = {};
+      datosProduccion.forEach(p => {
+        const fecha = new Date(p.fechaCorte);
+        const mesAno = `${fecha.getMonth() + 1}/${fecha.getFullYear()}`;
+        
+        if (!produccionPorMes[mesAno]) {
+          produccionPorMes[mesAno] = { produccion: 0, meta: 0 };
+        }
+        produccionPorMes[mesAno].produccion += parseFloat(p.cantidadProduccion) || 0;
+        // Meta es 120% de la producción promedio
+        produccionPorMes[mesAno].meta = produccionPorMes[mesAno].produccion * 1.2;
+      });
+
+      const arrayProduccionPorMes = Object.keys(produccionPorMes)
+        .sort((a, b) => {
+          const [mesA, anoA] = a.split('/').map(Number);
+          const [mesB, anoB] = b.split('/').map(Number);
+          return (anoA * 12 + mesA) - (anoB * 12 + mesB);
+        })
+        .slice(-6)
+        .map(mesAno => ({
+          mes: mesAno,
+          produccion: parseFloat(produccionPorMes[mesAno].produccion.toFixed(2)),
+          meta: parseFloat(produccionPorMes[mesAno].meta.toFixed(2))
+        }));
+
+      // ========================================
+      // 4. ESTADOS DE FORMULARIOS
+      // ========================================
+      
+      const todosFormularios = [
+        ...datosProduccion,
+        ...datosInventarios,
+        ...datosParadas,
+        ...datosMaquinaria
+      ];
+
+      const estadosCount = {
+        'Enviados': 0,
+        'Aprobados': 0,
+        'Pendientes': 0,
+        'Borradores': 0
+      };
+
+      todosFormularios.forEach(f => {
+        if (f.estado === 'ENVIADO') estadosCount['Enviados']++;
+        else if (f.estado === 'APROBADO') estadosCount['Aprobados']++;
+        else if (f.estado === 'RECHAZADO') estadosCount['Pendientes']++;
+        else if (f.estado === 'BORRADOR') estadosCount['Borradores']++;
+      });
+
+      const estadosFormularios = Object.keys(estadosCount).map(estado => ({
+        estado,
+        cantidad: estadosCount[estado]
+      }));
+
+      // ========================================
+      // 5. ÚLTIMAS PARADAS
+      // ========================================
+      
+      const ultimasParadas = datosParadas
+        .sort((a, b) => new Date(b.fechaCorte) - new Date(a.fechaCorte))
+        .slice(0, 5)
+        .map(p => ({
+          fecha: p.fechaCorte,
+          tipo: p.tipoParada || 'Sin especificar',
+          duracion: calcularDuracionHoras(p.fechaInicio, p.fechaFin),
+          motivo: p.motivo || 'Sin descripción'
+        }));
+
+      // ========================================
+      // 6. ACTUALIZAR ESTADO
+      // ========================================
+
+      setDashboardData({
+        kpis: {
+          totalProduccion: parseFloat(totalProduccion.toFixed(2)),
+          totalInventario: parseFloat(totalInventario.toFixed(2)),
+          totalParadas,
+          eficiencia: parseFloat(eficiencia),
+          horasOperativas: parseFloat(horasOperativas.toFixed(1))
+        },
+        produccionPorMes: arrayProduccionPorMes,
+        distribucionMinerales,
+        estadosFormularios,
+        ultimasParadas,
+        produccionPorMineral: distribucionMinerales
+      });
+
     } catch (error) {
-      console.error('Error cargando dashboard:', error);
-      // Datos de ejemplo para demostración
-      setDashboardData(generateMockData());
+      console.error('Error al cargar datos del dashboard:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const generateMockData = () => {
-    return {
-      kpis: {
-        totalProduccion: 12450,
-        totalInventario: 3200,
-        paradas: 15,
-        eficiencia: 87.5,
-      },
-      produccionMensual: [
-        { mes: 'Ene', produccion: 980, meta: 1000 },
-        { mes: 'Feb', produccion: 1050, meta: 1000 },
-        { mes: 'Mar', produccion: 920, meta: 1000 },
-        { mes: 'Abr', produccion: 1100, meta: 1000 },
-        { mes: 'May', produccion: 1080, meta: 1000 },
-        { mes: 'Jun', produccion: 1150, meta: 1000 },
-      ],
-      distribucionMinerales: [
-        { nombre: 'Oro', valor: 3500, porcentaje: 28 },
-        { nombre: 'Arena', valor: 4200, porcentaje: 34 },
-        { nombre: 'Grava', valor: 2800, porcentaje: 22 },
-        { nombre: 'Arcilla', valor: 1950, porcentaje: 16 },
-      ],
-      estadosFormularios: [
-        { estado: 'Aprobados', cantidad: 198 },
-        { estado: 'Pendientes', cantidad: 32 },
-        { estado: 'Rechazados', cantidad: 15 },
-        { estado: 'Borradores', cantidad: 28 },
-      ],
-      ultimasParadas: [
-        { fecha: '2024-11-01', tipo: 'Mantenimiento', duracion: 4.5, motivo: 'Mantenimiento preventivo de equipos' },
-        { fecha: '2024-10-28', tipo: 'Falla', duracion: 8.0, motivo: 'Falla eléctrica en el sistema principal' },
-        { fecha: '2024-10-25', tipo: 'Climática', duracion: 12.0, motivo: 'Lluvia intensa impide operaciones' },
-        { fecha: '2024-10-20', tipo: 'Administrativa', duracion: 2.0, motivo: 'Reunión de seguridad obligatoria' },
-        { fecha: '2024-10-15', tipo: 'Mantenimiento', duracion: 3.0, motivo: 'Cambio de aceite en maquinaria' },
-      ],
-    };
+  const calcularDuracionHoras = (fechaInicio, fechaFin) => {
+    if (!fechaInicio || !fechaFin) return 0;
+    const inicio = new Date(fechaInicio);
+    const fin = new Date(fechaFin);
+    const diff = fin - inicio;
+    return (diff / (1000 * 60 * 60)).toFixed(1);
   };
 
-  const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444'];
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   if (loading) {
     return (
       <div className="loading-container">
-        <span className="loading"></span>
-        <p>Cargando dashboard...</p>
+        <div className="loading"></div>
+        <p>Cargando datos reales del dashboard...</p>
       </div>
     );
   }
 
   return (
     <div className="dashboard-container">
-      <header className="page-header">
+      {/* Header */}
+      <header className="dashboard-header">
         <div className="container">
-          <button onClick={() => navigate('/home')} className="btn btn-outline">
-            <ArrowLeft size={18} />
-            Volver
-          </button>
-          <h1>📊 Dashboard Analítico</h1>
+          <div className="header-content">
+            <div className="header-left">
+              <div className="logo">
+                <img src="/logo.png" alt="Logo TU MINA" width="50" height="50"
+                 style={{ borderRadius: '8px', objectFit: 'contain' }} />
+              </div>
+              <div>
+                <h1>TU MINA</h1>
+                <p>Desarrollado por CTGlobal</p>
+              </div>
+            </div>
+            
+            <div className="header-right">
+              <div className="user-info">
+                <div className="user-avatar">
+                  <User size={20} />
+                </div>
+                <div className="user-details">
+                  <p className="user-name">{usuario?.nombre || 'Usuario'}</p>
+                  <p className="user-role">{usuario?.rol || 'ROL'}</p>
+                </div>
+              </div>
+              
+              <button onClick={handleLogout} className="btn-logout">
+                <LogOut size={18} />
+                Salir
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
       <main className="page-main">
         <div className="container">
-          {/* KPIs */}
+          
+          {/* ========================================
+              SECCIÓN 1: KPIs PRINCIPALES
+              ======================================== */}
           <section className="kpi-section fade-in">
             <div className="grid grid-4">
-              <div className="kpi-card" style={{ borderLeft: '4px solid #2563eb' }}>
+              
+              {/* Producción Total */}
+              <div className="kpi-card" style={{ borderLeft: '4px solid #3b82f6' }}>
                 <div className="kpi-icon" style={{ background: '#dbeafe' }}>
-                  <Activity size={24} color="#2563eb" />
+                  <Activity size={28} color="#3b82f6" />
                 </div>
                 <div className="kpi-content">
                   <h4>Producción Total</h4>
                   <h3>{dashboardData.kpis.totalProduccion.toLocaleString()} Ton</h3>
-                  <div className="kpi-trend positive">
-                    <TrendingUp size={16} />
-                    <span>+12% vs mes anterior</span>
+                  <div className="kpi-meta">
+                    <Clock size={14} />
+                    <span>{dashboardData.kpis.horasOperativas}h operativas</span>
                   </div>
                 </div>
               </div>
 
+              {/* Inventario Actual */}
               <div className="kpi-card" style={{ borderLeft: '4px solid #10b981' }}>
                 <div className="kpi-icon" style={{ background: '#d1fae5' }}>
-                  <Activity size={24} color="#10b981" />
+                  <Package size={28} color="#10b981" />
                 </div>
                 <div className="kpi-content">
                   <h4>Inventario Actual</h4>
                   <h3>{dashboardData.kpis.totalInventario.toLocaleString()} Ton</h3>
-                  <div className="kpi-trend positive">
-                    <TrendingUp size={16} />
-                    <span>+5% vs mes anterior</span>
+                  <div className="kpi-meta">
+                    <TrendingUp size={14} />
+                    <span>En acopio</span>
                   </div>
                 </div>
               </div>
 
+              {/* Paradas Totales */}
               <div className="kpi-card" style={{ borderLeft: '4px solid #f59e0b' }}>
                 <div className="kpi-icon" style={{ background: '#fef3c7' }}>
-                  <Activity size={24} color="#f59e0b" />
+                  <AlertCircle size={28} color="#f59e0b" />
                 </div>
                 <div className="kpi-content">
                   <h4>Paradas Totales</h4>
-                  <h3>{dashboardData.kpis.paradas}</h3>
-                  <div className="kpi-trend negative">
-                    <TrendingDown size={16} />
-                    <span>+3 vs mes anterior</span>
+                  <h3>{dashboardData.kpis.totalParadas}</h3>
+                  <div className="kpi-meta">
+                    <Calendar size={14} />
+                    <span>Registradas</span>
                   </div>
                 </div>
               </div>
 
+              {/* Eficiencia */}
               <div className="kpi-card" style={{ borderLeft: '4px solid #8b5cf6' }}>
                 <div className="kpi-icon" style={{ background: '#ede9fe' }}>
-                  <Activity size={24} color="#8b5cf6" />
+                  <BarChart3 size={28} color="#8b5cf6" />
                 </div>
                 <div className="kpi-content">
                   <h4>Eficiencia</h4>
                   <h3>{dashboardData.kpis.eficiencia}%</h3>
-                  <div className="kpi-trend positive">
-                    <TrendingUp size={16} />
-                    <span>+2.5% vs mes anterior</span>
+                  <div className="kpi-meta">
+                    <TrendingUp size={14} />
+                    <span>Ton/Hora</span>
                   </div>
                 </div>
               </div>
+
             </div>
           </section>
 
-          {/* Charts Row 1 */}
+          {/* ========================================
+              SECCIÓN 2: GRÁFICOS
+              ======================================== */}
           <section className="charts-section fade-in">
             <div className="grid grid-2">
-              {/* Producción Mensual */}
+              
+              {/* Gráfico 1: Producción por Mes */}
               <div className="card">
-                <h3>📈 Producción Mensual vs Meta</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={dashboardData.produccionMensual}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="mes" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="produccion"
-                      stroke="#2563eb"
-                      strokeWidth={3}
-                      name="Producción"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="meta"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      name="Meta"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Distribución de Minerales */}
-              <div className="card">
-                <h3>🎯 Distribución por Mineral</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={dashboardData.distribucionMinerales}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ nombre, porcentaje }) => `${nombre}: ${porcentaje}%`}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="valor"
-                    >
-                      {dashboardData.distribucionMinerales.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </section>
-
-          {/* Charts Row 2 */}
-          <section className="charts-section fade-in">
-            <div className="grid grid-2">
-              {/* Estados de Formularios */}
-              <div className="card">
-                <h3>📋 Estado de Formularios</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={dashboardData.estadosFormularios}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="estado" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="cantidad" fill="#2563eb" name="Cantidad" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Tabla de Últimas Paradas */}
-              <div className="card">
-                <h3>⏸️ Últimas Paradas de Producción</h3>
-                <div className="table-container">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Fecha</th>
-                        <th>Tipo</th>
-                        <th>Duración</th>
-                        <th>Motivo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dashboardData.ultimasParadas && dashboardData.ultimasParadas.length > 0 ? (
-                        dashboardData.ultimasParadas.map((parada, index) => (
-                          <tr key={index}>
-                            <td>{new Date(parada.fecha).toLocaleDateString('es-CO')}</td>
-                            <td>
-                              <span className={`badge badge-${parada.tipo.toLowerCase()}`}>
-                                {parada.tipo}
-                              </span>
-                            </td>
-                            <td>{parada.duracion}h</td>
-                            <td>{parada.motivo}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="4" style={{ textAlign: 'center', color: '#999' }}>
-                            No hay paradas registradas
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                <h3>📈 Producción Mensual</h3>
+                <div className="chart-container">
+                  {dashboardData.produccionPorMes.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={dashboardData.produccionPorMes}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="mes" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line 
+                          type="monotone" 
+                          dataKey="produccion" 
+                          stroke="#3b82f6" 
+                          strokeWidth={3}
+                          name="Producción Real"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="meta" 
+                          stroke="#10b981" 
+                          strokeWidth={2}
+                          strokeDasharray="5 5"
+                          name="Meta"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="no-data">
+                      <p>No hay datos de producción mensual</p>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Gráfico 2: Distribución por Mineral */}
+              <div className="card">
+                <h3>⛏️ Distribución por Mineral</h3>
+                <div className="chart-container">
+                  {dashboardData.distribucionMinerales.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <RechartsPie>
+                        <Pie
+                          data={dashboardData.distribucionMinerales}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ nombre, porcentaje }) => `${nombre}: ${porcentaje}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="valor"
+                        >
+                          {dashboardData.distribucionMinerales.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </RechartsPie>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="no-data">
+                      <p>No hay datos de minerales</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
           </section>
 
-          {/* Resumen Estadístico */}
+          {/* ========================================
+              SECCIÓN 3: ESTADOS DE FORMULARIOS
+              ======================================== */}
+          <section className="status-section fade-in">
+            <div className="card">
+              <h3>📋 Estado de Formularios</h3>
+              <div className="chart-container">
+                {dashboardData.estadosFormularios.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={dashboardData.estadosFormularios}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="estado" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="cantidad" fill="#3b82f6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="no-data">
+                    <p>No hay datos de formularios</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* ========================================
+              SECCIÓN 4: ÚLTIMAS PARADAS
+              ======================================== */}
+          <section className="table-section fade-in">
+            <div className="card">
+              <h3>⏸️ Últimas Paradas de Producción</h3>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Tipo</th>
+                      <th>Duración</th>
+                      <th>Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboardData.ultimasParadas.length > 0 ? (
+                      dashboardData.ultimasParadas.map((parada, index) => (
+                        <tr key={index}>
+                          <td>{new Date(parada.fecha).toLocaleDateString('es-CO')}</td>
+                          <td>
+                            <span className={`badge badge-${parada.tipo.toLowerCase().replace(/\s+/g, '-')}`}>
+                              {parada.tipo}
+                            </span>
+                          </td>
+                          <td>{parada.duracion}h</td>
+                          <td>{parada.motivo}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" style={{ textAlign: 'center', color: '#999' }}>
+                          No hay paradas registradas
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          {/* ========================================
+              SECCIÓN 5: RESUMEN POR MINERAL
+              ======================================== */}
           <section className="summary-section fade-in">
             <div className="card">
-              <h3>📊 Resumen Estadístico del Período</h3>
+              <h3>📊 Resumen por Mineral</h3>
               <div className="grid grid-4">
-                {dashboardData.distribucionMinerales.map((mineral, index) => (
+                {dashboardData.produccionPorMineral.map((mineral, index) => (
                   <div key={index} className="summary-item">
-                    <div className="summary-icon" style={{ background: COLORS[index] }}>
+                    <div className="summary-icon" style={{ background: COLORS[index % COLORS.length] }}>
                       {mineral.nombre.charAt(0)}
                     </div>
                     <div>
@@ -302,6 +502,7 @@ const Dashboard = () => {
               </div>
             </div>
           </section>
+
         </div>
       </main>
     </div>
