@@ -10,7 +10,8 @@ import { selectIsAuthenticated } from '../store/authSlice';
 // Screens
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
-import RegistroProduccionScreen from '../screens/RegistroProduccionScreen'; 
+import RegistroProduccionScreen from '../screens/RegistroProduccionScreen';
+import RegistroCiclosScreen from '../screens/RegistroCiclosScreen'; // ← NUEVA LÍNEA
 
 const Stack = createNativeStackNavigator();
 
@@ -30,9 +31,26 @@ export default function AppNavigator() {
         ) : (
           // Stack principal (después de login)
           <>
-            <Stack.Screen name="Home" component={HomeScreen} />
-                        <Stack.Screen name="RegistroProduccion" component={RegistroProduccionScreen} /> 
-            {/* Las otras pantallas las agregaremos en las siguientes sesiones */}
+            <Stack.Screen 
+              name="Home" 
+              component={HomeScreen}
+              options={{ title: 'Inicio' }}
+            />
+            <Stack.Screen 
+              name="RegistroProduccion" 
+              component={RegistroProduccionScreen}
+              options={{ title: 'Registro de Producción' }}
+            />
+            {/* ↓↓↓ NUEVA PANTALLA ↓↓↓ */}
+            <Stack.Screen 
+              name="RegistroCiclos" 
+              component={RegistroCiclosScreen}
+              options={{ 
+                title: 'Registro de Ciclos',
+                gestureEnabled: false, // Evitar salir por accidente
+              }}
+            />
+            {/* ↑↑↑ NUEVA PANTALLA ↑↑↑ */}
           </>
         )}
       </Stack.Navigator>
