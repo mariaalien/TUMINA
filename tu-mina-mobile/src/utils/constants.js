@@ -1,107 +1,59 @@
-// src/utils/constants.js
-// Configuración y constantes de la aplicación
-
-// ============================================
-// CONFIGURACIÓN DE LA API
-// ============================================
-
-// IMPORTANTE: Cambiar según tu entorno
-// Para emulador Android: http://10.0.2.2:5000
-// Para dispositivo físico: http://TU_IP_LOCAL:5000
-// Para web (desarrollo): http://localhost:5000
 import { Platform } from 'react-native';
-import THEME from './theme';
 
-export const API_BASE_URL = __DEV__ 
-  ? Platform.select({
-      // Para Android Emulator
-      android: 'http://10.0.2.2:5000/api',
-      // Para iOS Simulator
-      ios: 'http://localhost:5000/api',
-      // Para Web
-      web: 'http://localhost:5000/api',
-      // Para dispositivo físico, usar tu IP local
-      default: 'http://192.168.1.X:5000/api', // Cambiar X por tu IP
-    })
-  : 'http://TU_IP_PRODUCCION:5000/api';
+// ⚠️ IMPORTANTE: Para emulador Android usa 10.0.2.2 en lugar de localhost
+export const API_BASE_URL = Platform.select({
+  android: 'http://10.0.2.2:5000/api',  // Emulador Android
+  ios: 'http://localhost:5000/api',      // Simulador iOS
+  default: 'https://dressiest-baylee-complimentingly.ngrok-free.dev/api', // iPhone físico
+});
 
-// ============================================
-// ENDPOINTS
-// ============================================
+console.log('🔵 API_BASE_URL configurada:', API_BASE_URL);
+
 export const ENDPOINTS = {
-  // Autenticación
   LOGIN: '/auth/login',
-  PROFILE: '/auth/perfil',
-  
-  // Android/Mobile
+  PERFIL: '/auth/perfil',
   PUNTOS_REFERENCIA: (tituloMineroId) => `/android/puntos/${tituloMineroId}`,
-  INICIAR_REGISTRO: '/android/iniciar-registro',
-  REGISTRAR_CICLO: '/android/registrar-ciclo',
-  CICLOS_DEL_DIA: (usuarioId, tituloMineroId) => `/android/ciclos-del-dia/${usuarioId}/${tituloMineroId}`,
+  INICIAR_REGISTRO: '/android/iniciar',
+  REGISTRAR_CICLO: '/android/ciclo',
+  REGISTRAR_CICLOS_BATCH: '/android/ciclos-batch',
+  CICLOS_DEL_DIA: (usuarioId, tituloMineroId) => `/android/ciclos/${usuarioId}/${tituloMineroId}`,
   ESTADISTICAS: (usuarioId, tituloMineroId) => `/android/estadisticas/${usuarioId}/${tituloMineroId}`,
 };
 
-// ============================================
-// CONFIGURACIÓN DE UBICACIÓN
-// ============================================
+export const STORAGE_KEYS = {
+  TOKEN: '@tu_mina_token',
+  USER_DATA: '@tu_mina_user_data',
+};
+
 export const LOCATION_CONFIG = {
-  // Radio de influencia de los puntos (en metros)
-  RADIO_INFLUENCIA: 50,
-  
-  // Intervalo de actualización de GPS (en milisegundos)
-  // 5000 = 5 segundos
-  UPDATE_INTERVAL: 5000,
-  
-  // Distancia mínima para actualizar (en metros)
-  MIN_DISTANCE: 10,
-  
-  // Precisión deseada
-  ACCURACY: 'high', // 'low', 'balanced', 'high', 'best'
+  ACCURACY: 'high',
+  TIME_INTERVAL: 5000,
+  DISTANCE_INTERVAL: 10,
 };
 
-// ============================================
-// ESTADOS DE CICLO
-// ============================================
 export const ESTADO_CICLO = {
-  EN_PUNTO_RECOLECCION: 'EN_PUNTO_RECOLECCION',
-  EN_RUTA_A_ACOPIO: 'EN_RUTA_A_ACOPIO',
-  EN_PUNTO_ACOPIO: 'EN_PUNTO_ACOPIO',
-  EN_RUTA_A_RECOLECCION: 'EN_RUTA_A_RECOLECCION',
-  CICLO_COMPLETADO: 'CICLO_COMPLETADO',
+  ESPERANDO: 'ESPERANDO',
+  EN_PUNTO_RECOLECCION: 'EN_R',
+  EN_RUTA_A_ACOPIO: 'RUTA_A',
+  EN_PUNTO_ACOPIO: 'EN_A',
+  EN_RUTA_A_RECOLECCION: 'RUTA_R',
 };
 
-// ============================================
-// TIPOS DE PUNTO
-// ============================================
 export const TIPO_PUNTO = {
   RECOLECCION: 'RECOLECCION',
   ACOPIO: 'ACOPIO',
 };
 
-// ============================================
-// STORAGE KEYS
-// ============================================
-export const STORAGE_KEYS = {
-  TOKEN: '@tu_mina_token',
-  USER_ID: '@tu_mina_user_id',
-  USER_NAME: '@tu_mina_user_name',
-  TITULO_MINERO_ID: '@tu_mina_titulo_id',
-  CICLOS_PENDIENTES: '@tu_mina_ciclos_pendientes',
-};
-
-// ============================================
-// COLORES DE LA APP
-// ============================================
-export const COLORS = THEME.colors;
-
-// ============================================
-// TIPOS DE MAQUINARIA
-// ============================================
 export const TIPOS_MAQUINARIA = [
-  'Excavadora',
-  'Retroexcavadora',
-  'Cargador',
-  'Volqueta',
-  'Bulldozer',
-  'Motoniveladora',
+  { value: 'Excavadora', label: '🚜 Excavadora', capacidadDefecto: 30 },
+  { value: 'Retroexcavadora', label: '🏗️ Retroexcavadora', capacidadDefecto: 25 },
+  { value: 'Cargador', label: '🚛 Cargador Frontal', capacidadDefecto: 35 },
+  { value: 'Bulldozer', label: '🚧 Bulldozer', capacidadDefecto: 40 },
+  { value: 'Volqueta', label: '🚚 Volqueta', capacidadDefecto: 50 },
+  { value: 'Motoniveladora', label: '🛣️ Motoniveladora', capacidadDefecto: 20 },
 ];
+
+export const VALIDACIONES = {
+  MAX_CAPACIDAD_M3: 100,
+  MIN_CAPACIDAD_M3: 1,
+};

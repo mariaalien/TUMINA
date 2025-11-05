@@ -1,59 +1,96 @@
 // src/navigation/AppNavigator.js
-// Navegación principal de la aplicación
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useSelector } from 'react-redux';
-import { selectIsAuthenticated } from '../store/authSlice';
+import { createStackNavigator } from '@react-navigation/stack';
+import { ActivityIndicator, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Screens
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
-import RegistroProduccionScreen from '../screens/RegistroProduccionScreen';
-import RegistroCiclosScreen from '../screens/RegistroCiclosScreen'; // ← NUEVA LÍNEA
+import RegistrarPuntoScreen from '../screens/RegistrarPuntoScreen';
+import HistorialPuntosScreen from '../screens/HistorialPuntosScreen';
 
-const Stack = createNativeStackNavigator();
+import { STORAGE_KEYS } from '../utils/constants';
+import COLORS from '../utils/colors';
 
-export default function AppNavigator() {
-  const isAuthenticated = useSelector(selectIsAuthenticated);
+const Stack = createStackNavigator();
+
+const AppNavigator = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+      setIsLoggedIn(!!token);
+    } catch (error) {
+      console.error('Error checking auth:', error);
+      setIsLoggedIn(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>
       <Stack.Navigator
+        initialRouteName={isLoggedIn ? 'Home' : 'Login'}
         screenOptions={{
-          headerShown: false,
+          headerStyle: {
+            backgroundColor: COLORS.primary,
+          },
+          headerTintColor: COLORS.white,
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
         }}
       >
-        {!isAuthenticated ? (
-          // Stack de autenticación
-          <Stack.Screen name="Login" component={LoginScreen} />
-        ) : (
-          // Stack principal (después de login)
-          <>
-            <Stack.Screen 
-              name="Home" 
-              component={HomeScreen}
-              options={{ title: 'Inicio' }}
-            />
-            <Stack.Screen 
-              name="RegistroProduccion" 
-              component={RegistroProduccionScreen}
-              options={{ title: 'Registro de Producción' }}
-            />
-            {/* ↓↓↓ NUEVA PANTALLA ↓↓↓ */}
-            <Stack.Screen 
-              name="RegistroCiclos" 
-              component={RegistroCiclosScreen}
-              options={{ 
-                title: 'Registro de Ciclos',
-                gestureEnabled: false, // Evitar salir por accidente
-              }}
-            />
-            {/* ↑↑↑ NUEVA PANTALLA ↑↑↑ */}
-          </>
-        )}
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        
+        <Stack.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="RegistrarPunto"
+          component={RegistrarPuntoScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="HistorialPuntos"
+          component={HistorialPuntosScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
-}
+};
+
+export default AppNavigator;

@@ -20,7 +20,8 @@ import {
   Truck,
   DollarSign,
   Layers,
-  Zap
+  Zap,
+  Map
 } from 'lucide-react';
 import './Home.css';
 
@@ -135,6 +136,14 @@ const Home = () => {
       path: '/reportes',
       color: '#f59e0b',
       gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+    },
+    {
+    icon: <Map size={32} />,
+    title: 'Mapa de Actividades',
+    description: 'Visualizar puntos georeferenciados',
+    path: '/mapa',
+    color: '#06b6d4',
+    gradient: 'linear-gradient(135deg, #667eea 0%, #06b6d4 100%)',
     },
   ];
 

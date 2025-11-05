@@ -1,36 +1,62 @@
 {
   "expo": {
-    "name": "Tu Mina - Registro Producción",
+    "name": "TU MINA",
     "slug": "tu-mina-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tumina.produccion"
+      "bundleIdentifier": "com.tumina.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a tu ubicación para registrar los ciclos de producción.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Esta aplicación necesita acceso continuo a tu ubicación para registrar los ciclos de producción.",
+        "UIBackgroundModes": ["location"]
+      }
     },
     "android": {
-      "package": "com.tumina.produccion",
+      "package": "com.tumina.mobile",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#3D9B9B"
+      },
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "FOREGROUND_SERVICE"
-      ]
+        "ACCESS_COARSE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "ACCESS_BACKGROUND_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCCzBAQm4wvKZCfVb7rtn4gyYZuPWh7-1A"
+        }
+      }
     },
     "web": {
-      "bundler": "metro"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "La app necesita acceso a tu ubicación para registrar los ciclos de producción."
+          "locationAlwaysAndWhenInUsePermission": "Esta aplicación necesita acceso a tu ubicación para registrar los ciclos de producción.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
         }
       ]
     ],
-    "scheme": "tumina"
+    "extra": {
+      "eas": {
+        "projectId": "tu-proyecto-id"
+      }
+    }
   }
 }

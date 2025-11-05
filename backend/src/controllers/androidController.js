@@ -117,7 +117,8 @@ const registrarCiclo = async (req, res) => {
       puntoRecoleccion,
       puntoAcopio,
       distanciaRecorrida,
-      observaciones
+      observaciones,
+      fecha
     } = req.body;
 
     // Calcular duración en minutos
@@ -136,15 +137,16 @@ const registrarCiclo = async (req, res) => {
         horaInicioCiclo: new Date(horaInicioCiclo),
         horaFinCiclo: new Date(horaFinCiclo),
         duracionMinutos: parseFloat(duracionMinutos.toFixed(2)),
-        latitudInicio: parseFloat(latitudInicio),
-        longitudInicio: parseFloat(longitudInicio),
-        latitudFin: parseFloat(latitudFin),
-        longitudFin: parseFloat(longitudFin),
-        puntoRecoleccion,
-        puntoAcopio,
+        latitudInicio: latitudInicio ? parseFloat(latitudInicio) : null,
+        longitudInicio: longitudInicio ? parseFloat(longitudInicio) : null,
+        latitudFin: latitudFin ? parseFloat(latitudFin) : null,
+        longitudFin: longitudFin ? parseFloat(longitudFin) : null,
+        puntoRecoleccion: puntoRecoleccion || null,
+        puntoAcopio: puntoAcopio || null,
         distanciaRecorrida: distanciaRecorrida ? parseFloat(distanciaRecorrida) : null,
         estadoCiclo: 'COMPLETADO',
-        observaciones: observaciones || null
+        observaciones: observaciones || null,
+        fecha: fecha ? new Date(fecha) : new Date()
       }
     });
 
@@ -206,47 +208,45 @@ const getCiclosDelDia = async (req, res) => {
 const getEstadisticasProduccion = async (req, res) => {
   try {
     const { usuarioId, tituloMineroId } = req.params;
-    const { fechaInicio, fechaFin } = req.query;
 
-    const whereClause = {
-      usuarioId,
-      tituloMineroId
-    };
+    console.log('📊 Obteniendo estadísticas:', { usuarioId, tituloMineroId });
 
-    if (fechaInicio && fechaFin) {
-      whereClause.fecha = {
-        gte: new Date(fechaInicio),
-        lte: new Date(fechaFin)
-      };
-    }
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
 
+    // Usar Prisma
     const ciclos = await prisma.registroCicloProduccion.findMany({
-      where: whereClause
+      where: {
+        usuarioId: usuarioId,
+        tituloMineroId: tituloMineroId,
+        fecha: {
+          gte: hoy,
+        },
+        estadoCiclo: 'COMPLETADO',
+      },
     });
 
-    // Calcular estadísticas
-    const totalCiclos = ciclos.length;
-    const tiempoTotalMinutos = ciclos.reduce((sum, c) => sum + parseFloat(c.duracionMinutos), 0);
-    const distanciaTotal = ciclos.reduce((sum, c) => sum + (parseFloat(c.distanciaRecorrida) || 0), 0);
-    const promedioTiempoCiclo = totalCiclos > 0 ? tiempoTotalMinutos / totalCiclos : 0;
+    const ciclosHoy = ciclos.length;
+    const volumenHoy = ciclos.reduce(
+      (sum, ciclo) => sum + parseFloat(ciclo.capacidadMaxM3 || 0),
+      0
+    );
+
+    console.log('📊 Estadísticas calculadas:', { ciclosHoy, volumenHoy });
 
     res.json({
       success: true,
       data: {
-        totalCiclos,
-        tiempoTotalMinutos: tiempoTotalMinutos.toFixed(2),
-        tiempoTotalHoras: (tiempoTotalMinutos / 60).toFixed(2),
-        distanciaTotal: distanciaTotal.toFixed(2),
-        promedioTiempoCiclo: promedioTiempoCiclo.toFixed(2),
-        ciclos: ciclos
-      }
+        ciclosHoy,
+        volumenHoy: volumenHoy.toFixed(2),
+      },
     });
   } catch (error) {
-    console.error('Error al obtener estadísticas:', error);
+    console.error('❌ Error obteniendo estadísticas:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener estadísticas',
-      error: error.message
+      message: 'Error obteniendo estadísticas',
+      error: error.message,
     });
   }
 };
@@ -290,7 +290,8 @@ const registrarCiclosBatch = async (req, res) => {
             puntoAcopio: ciclo.puntoAcopio,
             distanciaRecorrida: ciclo.distanciaRecorrida ? parseFloat(ciclo.distanciaRecorrida) : null,
             estadoCiclo: 'COMPLETADO',
-            observaciones: ciclo.observaciones || null
+            observaciones: ciclo.observaciones || null,
+            fecha: ciclo.fecha ? new Date(ciclo.fecha) : new Date()
           }
         });
       })

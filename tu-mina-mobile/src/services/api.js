@@ -1,221 +1,241 @@
 // src/services/api.js
-// Servicio de comunicación con el backend usando Axios
-
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, ENDPOINTS, STORAGE_KEYS } from '../utils/constants';
 
-// ============================================
-// CREAR INSTANCIA DE AXIOS
-// ============================================
+// Configurar axios
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30 segundos
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// ============================================
-// INTERCEPTOR DE REQUEST
-// Agregar token JWT automáticamente
-// ============================================
+console.log('🔵 API_BASE_URL configurada:', API_BASE_URL);
+
+// Interceptor para agregar token
 api.interceptors.request.use(
   async (config) => {
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      console.log('📤 Request:', config.method.toUpperCase(), config.url);
-      return config;
-    } catch (error) {
-      console.error('Error al obtener token:', error);
-      return config;
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    return config;
   },
   (error) => {
-    console.error('❌ Request error:', error);
     return Promise.reject(error);
   }
 );
 
-// ============================================
-// INTERCEPTOR DE RESPONSE
-// Manejar errores globalmente
-// ============================================
+// Interceptor para manejar respuestas
 api.interceptors.response.use(
-  (response) => {
-    console.log('📥 Response:', response.status, response.config.url);
-    return response;
-  },
-  async (error) => {
-    console.error('❌ Response error:', error.response?.status, error.config?.url);
-    
-    // Si el token expiró (401), limpiar sesión
-    if (error.response?.status === 401) {
-      await AsyncStorage.multiRemove([
-        STORAGE_KEYS.TOKEN,
-        STORAGE_KEYS.USER_ID,
-        STORAGE_KEYS.USER_NAME,
-        STORAGE_KEYS.TITULO_MINERO_ID,
-      ]);
-      // Aquí podrías redirigir al login si tienes acceso a la navegación
-    }
-    
+  (response) => response.data,
+  (error) => {
+    console.error('Error en API:', error.response?.data || error.message);
     return Promise.reject(error);
   }
 );
 
-// ============================================
-// SERVICIOS DE AUTENTICACIÓN
-// ============================================
-export const authService = {
-  /**
-   * Login de usuario
-   */
-  login: async (email, password) => {
-    try {
-      const response = await api.post(ENDPOINTS.LOGIN, { email, password });
-      
-      if (response.data.success && response.data.token) {
-        // Guardar token y datos del usuario
-        await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, response.data.token);
-        await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, response.data.usuario.id);
-        await AsyncStorage.setItem(STORAGE_KEYS.USER_NAME, response.data.usuario.nombre);
-        
-        if (response.data.usuario.tituloMineroId) {
-          await AsyncStorage.setItem(
-            STORAGE_KEYS.TITULO_MINERO_ID,
-            response.data.usuario.tituloMineroId
-          );
-        }
-      }
-      
-      return response.data;
-    } catch (error) {
-      console.error('Error en login:', error);
-      throw error;
-    }
-  },
+// ==========================================
+// AUTH SERVICE
+// ==========================================
 
-  /**
-   * Logout de usuario
-   */
+export const authService = {
+  login: async (email, password) => {
+  try {
+    console.log('🔵 Login request a:', `${API_BASE_URL}${ENDPOINTS.LOGIN}`);
+    console.log('📧 Email:', email);
+    
+    const response = await api.post(ENDPOINTS.LOGIN, { 
+      email, 
+      password 
+    });
+    
+    console.log('🔵 Login response:', JSON.stringify(response, null, 2));
+
+    if (response && response.success) {
+      console.log('💾 Guardando datos en AsyncStorage...');
+      
+      // ⚠️ CORRECCIÓN: response.token NO response.data.token
+      const token = response.token;
+      await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token);
+      console.log('✅ Token guardado:', token.substring(0, 30) + '...');
+      
+      // ⚠️ CORRECCIÓN: response.usuario NO response.data.usuario
+      const usuario = response.usuario;
+      const userDataString = JSON.stringify(usuario);
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, userDataString);
+      console.log('✅ Usuario guardado:', userDataString);
+      
+      // VERIFICAR que se guardó
+      const verificar = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
+      console.log('🔍 Verificación - userData guardado:', verificar);
+      
+      return response;
+    } else {
+      console.log('❌ Response sin success:', response);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('❌ Error en login:', error);
+    console.error('❌ Error response:', error.response?.data);
+    
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Error de conexión'
+    };
+  }
+},
+
   logout: async () => {
     try {
-      await AsyncStorage.multiRemove([
-        STORAGE_KEYS.TOKEN,
-        STORAGE_KEYS.USER_ID,
-        STORAGE_KEYS.USER_NAME,
-        STORAGE_KEYS.TITULO_MINERO_ID,
-      ]);
+      await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+      console.log('✅ Sesión cerrada');
     } catch (error) {
       console.error('Error en logout:', error);
     }
   },
 
-  /**
-   * Obtener datos del usuario actual
-   */
-  getUserData: async () => {
+  getCurrentUser: async () => {
     try {
-      const userId = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
-      const userName = await AsyncStorage.getItem(STORAGE_KEYS.USER_NAME);
-      const tituloMineroId = await AsyncStorage.getItem(STORAGE_KEYS.TITULO_MINERO_ID);
-      
-      return { userId, userName, tituloMineroId };
-    } catch (error) {
-      console.error('Error al obtener datos del usuario:', error);
+      const userDataString = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
+      if (userDataString) {
+        return JSON.parse(userDataString);
+      }
       return null;
-    }
-  },
-
-  /**
-   * Verificar si hay sesión activa
-   */
-  isAuthenticated: async () => {
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
-      return !!token;
     } catch (error) {
-      return false;
+      console.error('Error obteniendo usuario:', error);
+      return null;
     }
   },
 };
 
-// ============================================
-// SERVICIOS DE PRODUCCIÓN (ANDROID)
-// ============================================
-export const produccionService = {
-  /**
-   * Obtener puntos de referencia
-   */
+logout: async () => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+    await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+    console.log('✅ Sesión cerrada');
+  } catch (error) {
+    console.error('Error en logout:', error);
+  }
+};
+
+
+// ==========================================
+// ANDROID SERVICE
+// ==========================================
+export const androidService = {
   getPuntosReferencia: async (tituloMineroId) => {
     try {
+      console.log('📍 Petición a:', `${API_BASE_URL}${ENDPOINTS.PUNTOS_REFERENCIA(tituloMineroId)}`);
       const response = await api.get(ENDPOINTS.PUNTOS_REFERENCIA(tituloMineroId));
-      return response.data;
+      console.log('✅ Respuesta puntos:', response);
+      return response;
     } catch (error) {
-      console.error('Error al obtener puntos:', error);
+      console.error('❌ Error obteniendo puntos:', error);
       throw error;
     }
   },
 
-  /**
-   * Iniciar sesión de registro
-   */
   iniciarRegistro: async (data) => {
     try {
       const response = await api.post(ENDPOINTS.INICIAR_REGISTRO, data);
-      return response.data;
+      return response;
     } catch (error) {
-      console.error('Error al iniciar registro:', error);
+      console.error('Error iniciando registro:', error);
       throw error;
     }
   },
 
-  /**
-   * Registrar un ciclo completado
-   */
-  registrarCiclo: async (ciclo) => {
+  registrarCiclo: async (cicloData) => {
     try {
-      const response = await api.post(ENDPOINTS.REGISTRAR_CICLO, ciclo);
-      return response.data;
+      console.log('💾 Guardando ciclo:', cicloData);
+      const response = await api.post(ENDPOINTS.REGISTRAR_CICLO, cicloData);
+      console.log('✅ Ciclo guardado:', response);
+      return response;
     } catch (error) {
-      console.error('Error al registrar ciclo:', error);
+      console.error('❌ Error guardando ciclo:', error);
       throw error;
     }
   },
 
-  /**
-   * Obtener ciclos del día
-   */
+  registrarCiclosBatch: async (ciclosData) => {
+    try {
+      const response = await api.post(ENDPOINTS.REGISTRAR_CICLOS_BATCH, { ciclos: ciclosData });
+      return response;
+    } catch (error) {
+      console.error('Error registrando ciclos batch:', error);
+      throw error;
+    }
+  },
+
   getCiclosDelDia: async (usuarioId, tituloMineroId) => {
     try {
       const response = await api.get(ENDPOINTS.CICLOS_DEL_DIA(usuarioId, tituloMineroId));
-      return response.data;
+      return response;
     } catch (error) {
-      console.error('Error al obtener ciclos del día:', error);
+      console.error('Error obteniendo ciclos del día:', error);
       throw error;
     }
   },
 
-  /**
-   * Obtener estadísticas
-   */
-  getEstadisticas: async (usuarioId, tituloMineroId, fechaInicio, fechaFin) => {
+   getEstadisticas: async (usuarioId, tituloMineroId) => {
     try {
-      let url = ENDPOINTS.ESTADISTICAS(usuarioId, tituloMineroId);
-      if (fechaInicio && fechaFin) {
-        url += `?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
-      }
-      const response = await api.get(url);
-      return response.data;
+      console.log('📊 Obteniendo estadísticas:', { usuarioId, tituloMineroId });
+      const response = await api.get(ENDPOINTS.ESTADISTICAS(usuarioId, tituloMineroId));
+      console.log('📊 Respuesta estadísticas:', response);
+      return response;
     } catch (error) {
-      console.error('Error al obtener estadísticas:', error);
+      console.error('❌ Error obteniendo estadísticas:', error);
+      // Retornar objeto por defecto en caso de error
+      return {
+        success: false,
+        data: {
+          ciclosHoy: 0,
+          volumenHoy: 0,
+        },
+        error: error.message,
+      };
+    }
+  },
+};
+
+export const actividadService = {
+  registrarPunto: async (punto) => {
+    try {
+      console.log('📍 Registrando punto:', punto);
+      const response = await api.post('/actividad/punto', punto);
+      return response;
+    } catch (error) {
+      console.error('Error registrando punto:', error);
       throw error;
     }
   },
+
+  getPuntos: async (tituloMineroId, filtros = {}) => {
+    try {
+      const params = new URLSearchParams(filtros).toString();
+      const url = `/actividad/puntos/${tituloMineroId}${params ? '?' + params : ''}`;
+      const response = await api.get(url);
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo puntos:', error);
+      throw error;
+    }
+  },
+
+  getEstadisticas: async (tituloMineroId) => {
+    try {
+      const response = await api.get(`/actividad/puntos/${tituloMineroId}/estadisticas`);
+      return response;
+    } catch (error) {
+      console.error('Error obteniendo estadísticas:', error);
+      throw error;
+    }
+  }
 };
 
 export default api;

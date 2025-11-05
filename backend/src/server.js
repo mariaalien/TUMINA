@@ -9,43 +9,35 @@ const jwt = require('jsonwebtoken');
 const excelReports = require('./services/excelReports');
 const simpleExporter = require('./services/simpleExporter');
 
-// RUTAS - IMPORTAR (pero NO usar todavía)
-const reportRoutesSimple = require('./routes/reportRoutesSimple');
-
 dotenv.config();
 
-// ✅ AHORA SÍ SE CREA APP
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
 
 // ============================================
-// MIDDLEWARE
+// MIDDLEWARE (SOLO UNA VEZ)
 // ============================================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'http://10.0.2.2:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // ============================================
-// REGISTRAR RUTAS (después de crear app y middleware)
+// IMPORTAR Y REGISTRAR RUTAS
 // ============================================
-app.use('/api/reports', reportRoutesSimple);
-
-
-// ============================================
-// RUTAS ANDROID
-// ============================================
-
-// Importar rutas de Android
 const androidRoutes = require('./routes/androidRoutes');
-// Usar rutas de Android
+const puntosActividadRoutes = require('./routes/puntosActividadRoutes');
+const reportRoutesSimple = require('./routes/reportRoutesSimple');
+
 app.use('/api/android', androidRoutes);
+app.use('/api/actividad', puntosActividadRoutes);
+app.use('/api/reports', reportRoutesSimple);
 
 // ============================================
 // RUTAS BÁSICAS

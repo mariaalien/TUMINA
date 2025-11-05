@@ -106,4 +106,30 @@ export const reportService = {
   exportarExcel: (params) => api.get('/reports/export', { params, responseType: 'blob' })
 };
 
+export const androidService = {
+  // ... otras funciones
+
+  getPuntos: async (tituloMineroId, filtros = {}) => {
+    try {
+      console.log('📍 Solicitando puntos para:', tituloMineroId);
+      
+      const params = new URLSearchParams(filtros).toString();
+      const url = `/actividad/puntos/${tituloMineroId}${params ? '?' + params : ''}`;
+      
+      console.log('🔵 URL:', `${API_BASE_URL}${url}`);
+      
+      const response = await api.get(url);
+      
+      console.log('📥 Respuesta getPuntos:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ Error obteniendo puntos:', error);
+      throw error;
+    }
+  },
+
+  // ... otras funciones
+};
+
 export default api;

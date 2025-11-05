@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import Formularios from './pages/Formularios';
 import Dashboard from './pages/Dashboard';
 import Reportes from './pages/Reportes';
+import MapaActividades from './pages/MapaActividades'; // ⚠️ NUEVO
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -61,6 +62,16 @@ function App() {
           element={
             <ProtectedRoute>
               <Reportes />
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* ⚠️ NUEVA RUTA: Mapa de Actividades */}
+        <Route
+          path="/mapa"
+          element={
+            <ProtectedRoute>
+              <MapaActividades />
             </ProtectedRoute>
           }
         />
